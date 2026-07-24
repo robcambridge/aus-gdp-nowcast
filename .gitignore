@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# readabs download cache (large, regenerable)
+.readabs_cache/
+
+# Raw downloads are regenerable; processed data IS committed for reproducibility
+data/raw/*
+!data/raw/.gitkeep
+
+# OS
+.DS_Store
