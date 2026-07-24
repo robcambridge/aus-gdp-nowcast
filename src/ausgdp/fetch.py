@@ -152,11 +152,19 @@ def save_raw(series_map: dict[str, pd.Series], directory: Path = CACHE_DIR) -> N
 
 
 def load_raw(directory: Path = CACHE_DIR) -> dict[str, pd.Series]:
-    """Reload previously saved raw series (no network needed)."""
+    """Reload previously saved raw series (no network needed).
+
+    Period strings round-trip cleanly because pd.Period infers the frequency
+    from the string form: "2024Q1" -> quarterly, "2024-01" -> monthly.
+    """
     out = {}
     for path in sorted(directory.glob("*.csv")):
+        if path.name.startswith("meta_"):
+            continue  # metadata dumps from 01_discover.py, not series data
         df = pd.read_csv(path)
+        if not {"ref_period", "value"} <= set(df.columns):
+            continue
         name = path.stem
-        idx = pd.PeriodIndex(df["ref_period"], freq="infer")
-        out[name] = pd.Series(df["value"].to_numpy(), index=idx, name=name)
+        idx = pd.PeriodIndex([pd.Period(p) for p in df["ref_period"]])
+        out[name] = pd.Series(df["value"].to_numpy(dtype=float), index=idx, name=name)
     return out

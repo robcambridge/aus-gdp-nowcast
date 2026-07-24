@@ -3,7 +3,7 @@
 Point-in-time nowcasting of Australian quarterly real GDP growth using monthly
 ABS and RBA indicators.
 
-**Status:** Phase 1 (data infrastructure). Modelling not yet implemented.
+**Status:** Phase 2. Point-in-time data layer complete; benchmark models running.
 
 ---
 
@@ -45,25 +45,43 @@ uv sync                                  # install dependencies
 uv run python scripts/02_demo_ragged_edge.py   # synthetic demo, no network
 uv run pytest                            # 9 tests, including a leakage check
 uv run python scripts/01_discover.py     # find real ABS series IDs
+uv run python scripts/05_check_series.py # download and verify
+uv run python scripts/06_build_dataset.py
+uv run python scripts/07_benchmark.py    # the number to beat
+uv run python scripts/08_horse_race.py   # do the indicators help?
 ```
 
 ## Layout
 
 ```
-src/ausgdp/config.py    Series registry + publication-lag table
-src/ausgdp/fetch.py     ABS/RBA download via readabs
-src/ausgdp/dataset.py   Long panel, Snapshot, as_of(), ragged-edge diagnostics
-scripts/01_discover.py  Confirm ABS series IDs (needs network)
-scripts/02_demo_*.py    Offline demonstration of the point-in-time logic
-tests/                  Leakage and ragged-edge invariants
+src/ausgdp/config.py       Series registry + verified publication lags
+src/ausgdp/fetch.py        ABS/RBA download via readabs
+src/ausgdp/dataset.py      Long panel, Snapshot, as_of(), ragged-edge diagnostics
+src/ausgdp/transforms.py   Stationarity transforms, ADF tests, quarterly aggregation
+src/ausgdp/benchmarks.py   Benchmarks, Context, backtest, Diebold-Mariano
+src/ausgdp/bridge.py       Bridge equations and ridge on monthly indicators
+
+scripts/01_discover.py     Confirm ABS series IDs            (network)
+scripts/02_demo_*.py       Offline demo of point-in-time logic
+scripts/03_search_meta.py  Search downloaded ABS metadata    (offline)
+scripts/04_list_catalogues.py  Find ABS collections          (network)
+scripts/05_check_series.py Verify pinned series, save raw    (network)
+scripts/06_build_dataset.py  Transform + build panel         (offline)
+scripts/07_benchmark.py    Benchmarks only                   (offline)
+scripts/08_horse_race.py   Full comparison at 3 vintages     (offline)
+
+tests/                     49 tests: leakage, ragged edge, transforms, backtest
 ```
 
 ## Limitations (read before believing any result)
 
-1. **Publication lags are assumed constant and are currently UNVERIFIED.**
-   Run `python -m ausgdp.config` to list unverified series. Each must be
-   checked against the [ABS release calendar](https://www.abs.gov.au/release-calendar)
-   before results mean anything. Lags were also longer historically than today.
+1. **Publication lags are conservative upper bounds, held constant.**
+   Verified against the [ABS release calendar](https://www.abs.gov.au/release-calendar)
+   on 2026-07-24; observed release dates are recorded in `config.py`. Each lag is
+   set to the longest recently observed delay plus a buffer, so the model
+   occasionally discards data it could legitimately have used. Measured accuracy
+   is therefore a **lower bound** on real-time performance. Lags are also held
+   constant across the sample, though ABS releases were slower historically.
 
 2. **Final-vintage data, not real-time vintages.** Values used are the latest
    revised estimates, not the first prints a forecaster would have seen.
@@ -81,14 +99,18 @@ tests/                  Leakage and ragged-edge invariants
 
 ## Planned
 
-- [ ] Confirm series IDs and verify every publication lag
-- [ ] Benchmarks: historical mean, random walk, AR(1), AR(p)
-- [ ] Bridge equations
+- [x] Confirm series IDs and verify every publication lag
+- [x] Point-in-time panel with ragged-edge handling
+- [x] Stationarity transforms and ADF tests
+- [x] Benchmarks: historical mean, random walk, AR(1), AR(p)
+- [x] Expanding-window backtest at each GDP release date
+- [x] Diebold-Mariano tests
+- [x] Bridge equations (partial-quarter consistent)
+- [x] Ridge on all indicators
+- [x] RMSE by days-into-quarter
 - [ ] Dynamic factor model (`statsmodels.tsa.statespace.dynamic_factor_mq`)
 - [ ] Ridge / gradient boosting comparison
-- [ ] Expanding-window backtest at each GDP release date
-- [ ] RMSE by days-into-quarter
-- [ ] Diebold–Mariano tests against AR(1)
+- [ ] RMSE by days-into-quarter against AR(1)
 
 ## Data sources
 

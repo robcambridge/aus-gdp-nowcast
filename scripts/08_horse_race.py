@@ -1,0 +1,234 @@
+"""Step 8: the full horse race.
+
+Benchmarks (which use only GDP's own past) against bridge equations and ridge
+(which use the monthly indicators). Run at three points in the quarter, so you
+can see accuracy improve as data arrives.
+
+This is the core result of the project.
+
+USAGE
+-----
+    uv run python scripts\\08_horse_race.py
+
+OUTPUT
+------
+    data/processed/horserace_scores.csv
+    data/processed/horserace_by_vintage.csv
+    outputs/figures/rmse_by_vintage.png
+    outputs/figures/horserace_actual_vs_predicted.png
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pandas as pd
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from ausgdp.benchmarks import BENCHMARKS, diebold_mariano, run_backtest  # noqa: E402
+from ausgdp.bridge import make_bridge, make_bridge_average, make_ridge  # noqa: E402
+from ausgdp.config import SHORT_HISTORY  # noqa: E402
+
+PROCESSED = Path("data/processed")
+FIGURES = Path("outputs/figures")
+
+# Days after the GDP release at which to form the nowcast.
+#   0  = the morning GDP is published; ~1 month of the target quarter is known
+#   30 = a month later; ~2 months known
+#   60 = two months later; the target quarter is over and fully measured,
+#        but its GDP is still ~1 month from publication
+OFFSETS = [0, 30, 60]
+
+
+def build_models(indicators: list[str]) -> dict:
+    models = dict(BENCHMARKS)
+    for name in indicators:
+        models[f"bridge_{name}"] = make_bridge(name)
+    models["bridge_average"] = make_bridge_average(indicators)
+    models["ridge"] = make_ridge(indicators)
+    return models
+
+
+def main() -> None:
+    path = PROCESSED / "panel.csv"
+    if not path.exists():
+        sys.exit(f"{path} not found. Run scripts\\06_build_dataset.py first.")
+
+    panel = pd.read_csv(path, parse_dates=["ref_end", "available_from"])
+
+    monthly_series = sorted(
+        set(panel.loc[panel["freq"] == "M", "series"]) - SHORT_HISTORY
+    )
+    if not monthly_series:
+        sys.exit("No monthly indicators in the panel. Check 06_build_dataset.py.")
+
+    print(f"Panel: {len(panel):,} observations")
+    print(f"Indicators used: {', '.join(monthly_series)}")
+    print(f"Excluded (short history): {', '.join(sorted(SHORT_HISTORY))}\n")
+
+    models = build_models(monthly_series)
+
+    all_scores, all_results = [], {}
+
+    for offset in OFFSETS:
+        res = run_backtest(panel, models=models, vintage_offset_days=offset)
+        all_results[offset] = res
+
+        for start, end, label in [
+            (None, None, "full"),
+            (None, "2019Q4", "pre-COVID"),
+            ("1993Q1", "2019Q4", "1993-2019"),
+        ]:
+            block = res.score(start=start, end=end, label=label)
+            if block.empty:
+                continue
+            block = block.reset_index().rename(columns={"index": "model"})
+            block.insert(0, "offset_days", offset)
+            all_scores.append(block)
+
+        print("=" * 74)
+        print(f"VINTAGE = GDP RELEASE + {offset} DAYS   ({len(res.forecasts)} nowcasts)")
+        print("=" * 74)
+        table = res.score(start="1993Q1", end="2019Q4", label="1993-2019")
+        if table.empty:
+            table = res.score(label="full")
+        print(table.drop(columns="sample").round(4).to_string())
+        print()
+
+    scores = pd.concat(all_scores, ignore_index=True)
+
+    # --- the headline: does more data help? --------------------------------
+    print("=" * 74)
+    print("RMSE BY HOW MUCH DATA HAS ARRIVED   (sample 1993-2019)")
+    print("=" * 74)
+    print("  If the indicators carry real signal, these fall left to right.\n")
+
+    modern = scores.loc[scores["sample"] == "1993-2019"]
+    if not modern.empty:
+        pivot = modern.pivot(index="model", columns="offset_days", values="rmse")
+        pivot = pivot.sort_values(pivot.columns[-1])
+        print(pivot.round(4).to_string())
+
+    # --- best model vs best benchmark --------------------------------------
+    res60 = all_results[OFFSETS[-1]]
+    table = res60.score(start="1993Q1", end="2019Q4")
+    if table.empty:
+        table = res60.score()
+
+    benchmark_names = set(BENCHMARKS)
+    best_benchmark = next(m for m in table.index if m in benchmark_names)
+    best_overall = table.index[0]
+
+    print("\n" + "=" * 74)
+    print(f"DIEBOLD-MARIANO vs best benchmark ({best_benchmark}), offset {OFFSETS[-1]}d")
+    print("=" * 74)
+    print("  Negative statistic => the challenger is MORE accurate.\n")
+
+    errors = res60.errors()
+    mask = (errors.index >= pd.Period("1993Q1", freq="Q")) & (
+        errors.index <= pd.Period("2019Q4", freq="Q")
+    )
+    errors = errors.loc[mask] if mask.any() else errors
+
+    rows = []
+    for name in errors.columns:
+        if name == best_benchmark:
+            continue
+        stat, pval = diebold_mariano(errors[name], errors[best_benchmark])
+        rows.append(
+            {
+                "model": name,
+                "dm_stat": round(stat, 3) if pd.notna(stat) else None,
+                "p_value": round(pval, 4) if pd.notna(pval) else None,
+                "verdict": (
+                    "no significant difference"
+                    if pd.isna(pval) or pval >= 0.05
+                    else ("BEATS benchmark" if stat < 0 else "worse")
+                ),
+            }
+        )
+    dm = pd.DataFrame(rows).sort_values("dm_stat")
+    print(dm.to_string(index=False))
+
+    base = table.loc[best_benchmark, "rmse"]
+    top = table.loc[best_overall, "rmse"]
+    print(f"\n  Best benchmark : {best_benchmark:<16} rmse {base:.4f}")
+    print(f"  Best overall   : {best_overall:<16} rmse {top:.4f}")
+    if best_overall != best_benchmark:
+        print(f"  Improvement    : {100 * (1 - top / base):.1f}%")
+    else:
+        print("  No model beat the benchmark. Report that honestly.")
+
+    # --- save --------------------------------------------------------------
+    PROCESSED.mkdir(parents=True, exist_ok=True)
+    scores.to_csv(PROCESSED / "horserace_scores.csv", index=False)
+
+    out = res60.forecasts.copy()
+    out["actual"] = res60.actuals
+    out["vintage"] = res60.vintages
+    out.to_csv(PROCESSED / "horserace_by_vintage.csv")
+
+    _plots(all_results, modern, best_overall)
+
+    print("\n" + "=" * 74)
+    print("  Written:")
+    print(f"    {PROCESSED / 'horserace_scores.csv'}")
+    print(f"    {PROCESSED / 'horserace_by_vintage.csv'}")
+    print(f"    {FIGURES / 'rmse_by_vintage.png'}")
+    print(f"    {FIGURES / 'horserace_actual_vs_predicted.png'}")
+
+
+def _plots(all_results, modern, best_overall) -> None:
+    try:
+        import matplotlib
+
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+    except ImportError:
+        print("\n  (matplotlib not available, skipping figures)")
+        return
+
+    FIGURES.mkdir(parents=True, exist_ok=True)
+
+    # RMSE by vintage offset
+    if not modern.empty:
+        pivot = modern.pivot(index="offset_days", columns="model", values="rmse")
+        fig, ax = plt.subplots(figsize=(9, 5))
+        for col in pivot.columns:
+            style = "-" if col == best_overall else "--"
+            width = 2.2 if col == best_overall else 1.0
+            ax.plot(pivot.index, pivot[col], style, lw=width, label=col, alpha=0.9)
+        ax.set_xlabel("days after the GDP release that the nowcast is made")
+        ax.set_ylabel("RMSE (percentage points)")
+        ax.set_title("Nowcast accuracy as monthly data arrives, 1993-2019", fontsize=11)
+        ax.legend(fontsize=7, ncol=2, frameon=False)
+        ax.spines[["top", "right"]].set_visible(False)
+        fig.tight_layout()
+        fig.savefig(FIGURES / "rmse_by_vintage.png", dpi=150)
+        plt.close(fig)
+
+    # Actual vs predicted at the richest information set
+    res = all_results[max(all_results)]
+    x = res.actuals.index.to_timestamp()
+    fig, ax = plt.subplots(figsize=(11, 4.5))
+    ax.axhline(0, lw=0.8, color="0.7")
+    ax.plot(x, res.actuals.to_numpy(), lw=1.6, color="#1b2a4a", label="actual")
+    ax.plot(
+        x, res.forecasts[best_overall].to_numpy(), lw=1.3, color="#c1440e",
+        ls="--", label=f"{best_overall} nowcast",
+    )
+    ax.set_title(
+        "Australian quarterly GDP growth: actual vs point-in-time nowcast", fontsize=11
+    )
+    ax.set_ylabel("% change on previous quarter")
+    ax.legend(frameon=False)
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+    fig.savefig(FIGURES / "horserace_actual_vs_predicted.png", dpi=150)
+    plt.close(fig)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,8 @@
+series,n,adf_stat,p_value,stationary_5pct,note
+building_approvals,514,-6.838,0.0,True,
+employment,580,-4.932,0.0,True,
+gdp_growth,266,-17.295,0.0,True,
+goods_exports,658,-9.027,0.0,True,
+hours_worked,575,-5.142,0.0,True,
+household_spending,166,-11.464,0.0,True,
+unemployment_rate,580,-6.554,0.0,True,
