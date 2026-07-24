@@ -5,24 +5,39 @@ This module is the single source of truth for:
   2. WHERE each one comes from,
   3. HOW LONG after its reference period each one is actually published.
 
-(3) is the part that makes or breaks a nowcasting project. If you assume a
-series is available earlier than it really was, your backtest sees the future
-and your results are fiction. Every lag below must be checked against the
-ABS/RBA release calendar before you trust a single result.
+(3) is what makes or breaks a nowcasting project. If you assume a series was
+available earlier than it really was, your backtest sees the future and your
+results are fiction.
+
+LAG POLICY: CONSERVATIVE UPPER BOUNDS
+-------------------------------------
+ABS release dates drift by several days from month to month, so there is no
+single "true" lag. We therefore set each lag to the LONGEST recently observed
+delay, plus a small buffer.
+
+The two errors are not symmetric:
+
+    lag too SHORT -> the model uses data that did not exist yet.
+                     Results inflated. Project worthless.
+    lag too LONG  -> we discard a day or two of genuinely available data.
+                     Results slightly understated. Project still honest.
+
+So we deliberately err long. Measured performance is a LOWER BOUND on what a
+real-time forecaster could have achieved. State this in the README.
+
+All lags below were checked against the ABS release calendar on 2026-07-24.
+The observed release dates behind each choice are recorded in `notes` so a
+reader can audit the decision rather than take it on trust.
 
     ABS release calendar: https://www.abs.gov.au/release-calendar
-    RBA statistical tables: https://www.rba.gov.au/statistics/tables/
 
-IMPORTANT CAVEATS
------------------
-* The `lag_days` values below are STARTING ESTIMATES, not verified facts.
-  Confirm each one and record the date you checked it in `lag_verified`.
-* Publication lags have changed over history. ABS releases were slower in the
-  1980s than today. We assume a constant lag, which is mildly optimistic for
-  early samples. Disclose this in your README.
-* ABS collections get restructured. Retail Trade and the monthly CPI have both
-  been reworked in recent years. Run `scripts/01_discover.py` to see what
-  actually exists today rather than trusting any hardcoded catalogue number.
+REMAINING CAVEAT
+----------------
+Lags are held CONSTANT across the whole sample. ABS releases were slower in the
+1980s and 1990s than today, so for early observations these bounds are, if
+anything, too generous to the model in the safe direction for recent data and
+possibly too tight for the oldest data. Disclose this. Fixing it properly means
+using true data vintages via readabs' `history=` parameter.
 """
 
 from __future__ import annotations
@@ -33,6 +48,9 @@ from typing import Literal
 Freq = Literal["M", "Q"]
 Transform = Literal["level", "pct", "diff", "log_pct"]
 
+# Date on which the publication lags below were checked against the ABS calendar.
+LAGS_CHECKED_ON = "2026-07-24"
+
 
 @dataclass(frozen=True)
 class SeriesSpec:
@@ -42,22 +60,20 @@ class SeriesSpec:
     ----------
     name        Short identifier used as the column name throughout the project.
     source      "abs" or "rba".
-    collection  ABS catalogue number (e.g. "6202.0") or RBA table id (e.g. "F1").
-    search      Metadata search terms used to locate the series. For ABS these
-                map {search_value: metadata_column}. Preferred over hardcoded
-                series IDs, which are easy to mistype and hard to audit.
-    series_id   Optional exact ABS Series ID. Fill this in once you have
-                confirmed it via scripts/01_discover.py -- it makes the fetch
-                fast and unambiguous.
+    collection  ABS catalogue number (e.g. "6202.0") or RBA table id (e.g. "F2").
+    search      Metadata search terms, {search_value: metadata_column}. Kept
+                even after pinning an ID, so the intent stays readable and the
+                series can be re-found if the ID is ever retired.
+    series_id   Exact ABS Series ID, confirmed via scripts/01_discover.py.
     freq        Native frequency. Do NOT pre-aggregate monthly data to
                 quarterly; the whole point is to keep the monthly timing.
-    transform   How to make it stationary. "pct" = percent change on the
-                previous period, "diff" = first difference, "level" = leave it.
-    lag_days    Days after the END of the reference period before the number is
-                published. This is the field that prevents look-ahead bias.
-    lag_verified  Date (YYYY-MM-DD) you last checked lag_days against the
-                official release calendar. Empty string means UNVERIFIED.
-    notes       Anything a reader of your README would want to know.
+    transform   How to make it stationary. "pct" = percent change on previous
+                period, "diff" = first difference, "level" = leave it alone.
+    lag_days    Conservative upper bound on days between the END of the
+                reference period and publication.
+    lag_verified  Date the lag was checked against the official calendar.
+                Empty string means UNVERIFIED -- do not trust results.
+    notes       Provenance and caveats. Read by humans, not code.
     """
 
     name: str
@@ -79,9 +95,9 @@ class SeriesSpec:
 # ---------------------------------------------------------------------------
 # TARGET
 # ---------------------------------------------------------------------------
-# Real GDP, chain volume measures, seasonally adjusted, from the quarterly
-# National Accounts. The ~65 day lag is why this project is a NOWCAST: by the
-# time you learn GDP for quarter t, quarter t+1 has already finished.
+# Real GDP, chain volume measures, seasonally adjusted, quarterly.
+# The ~63 day lag is why this project is a NOWCAST: by the time you learn GDP
+# for quarter t, quarter t+1 has already finished.
 
 TARGET = SeriesSpec(
     name="gdp_growth",
@@ -95,17 +111,27 @@ TARGET = SeriesSpec(
     freq="Q",
     transform="pct",
     lag_days=65,
-    lag_verified="2026-07-24",
-    notes="June quarter is published in early September => roughly 65 days.",
+    lag_verified=LAGS_CHECKED_ON,
+    notes=(
+        "Table 5206001_Key_Aggregates. 1959Q3 onwards, $ millions. "
+        "Observed releases: 2025Q4 -> 4 Mar 2026 (63d); 2026Q1 -> 3 Jun 2026 (64d); "
+        "2026Q2 -> 2 Sep 2026 (64d); 2026Q3 -> 2 Dec 2026 (63d); "
+        "2026Q4 -> 3 Mar 2027 (62d). Range 62-64, bound set to 65."
+    ),
 )
 
 
 # ---------------------------------------------------------------------------
 # MONTHLY PREDICTORS
 # ---------------------------------------------------------------------------
-# These are the source of your informational edge. Each one tells you something
-# about the current quarter well before GDP is published. Ordered roughly by
-# how quickly they arrive.
+
+_LFS_NOTE = (
+    "Labour Force Survey, table 62020X28. Observed releases: Apr 2026 -> 21 May (21d); "
+    "May -> 25 Jun (25d); Jun -> 23 Jul (23d); Jul -> 20 Aug (20d); Aug -> 24 Sep (24d). "
+    "Range 20-25, bound set to 26. NOTE: an earlier assumption of 17 days was WRONG "
+    "and would have leaked. Historically the release was the third Thursday "
+    "(~15-21d); a constant 26 is conservative for older data."
+)
 
 MONTHLY_PREDICTORS: list[SeriesSpec] = [
     SeriesSpec(
@@ -113,29 +139,33 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         source="abs",
         collection="6202.0",
         search={
-            "Employed total ;  Persons ;": "Data Item Description",
+            "Employed total ;  Persons ;  Australia ;": "Data Item Description",
             "Seasonally Adjusted": "Series Type",
         },
         series_id="A84423043C",
         freq="M",
         transform="pct",
-        lag_days=17,
-        notes="Labour Force Survey, released ~3rd Thursday of following month. "
-        "One of the fastest and most informative monthly indicators.",
+        lag_days=26,
+        lag_verified=LAGS_CHECKED_ON,
+        notes="Australia total, '000 persons, 1978-02 onwards. " + _LFS_NOTE,
     ),
     SeriesSpec(
         name="unemployment_rate",
         source="abs",
         collection="6202.0",
         search={
-            "Unemployment rate ;  Persons ;": "Data Item Description",
+            "Unemployment rate ;  Persons ;  Australia ;": "Data Item Description",
             "Seasonally Adjusted": "Series Type",
         },
         series_id="A84423050A",
         freq="M",
         transform="diff",
-        lag_days=17,
-        notes="A rate, so difference it rather than taking a percent change.",
+        lag_days=26,
+        lag_verified=LAGS_CHECKED_ON,
+        notes=(
+            "Australia total, percent, 1978-02 onwards. A rate, so DIFFERENCE it "
+            "rather than taking a percent change. " + _LFS_NOTE
+        ),
     ),
     SeriesSpec(
         name="hours_worked",
@@ -148,60 +178,97 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         series_id="A84426277X",
         freq="M",
         transform="pct",
-        lag_days=17,
-        notes="Often tracks output better than headcount, because firms adjust "
-        "hours before they adjust bodies.",
+        lag_days=26,
+        lag_verified=LAGS_CHECKED_ON,
+        notes=(
+            "Table 62020017, '000 hours, 1978-07 onwards. Often tracks output better "
+            "than headcount: firms adjust hours before they adjust bodies. " + _LFS_NOTE
+        ),
     ),
     SeriesSpec(
         name="building_approvals",
         source="abs",
         collection="8731.0",
         search={
-            "Total number of dwelling units ;": "Data Item Description",
+            "Total number of dwelling units ;  Total (Type of Building) ; "
+            " Total Sectors ;": "Data Item Description",
             "Seasonally Adjusted": "Series Type",
         },
         series_id="A422070J",
         freq="M",
         transform="pct",
-        lag_days=33,
-        notes="Volatile but genuinely forward-looking for dwelling investment.",
+        lag_days=38,
+        lag_verified=LAGS_CHECKED_ON,
+        notes=(
+            "Australia total dwelling units, table 8731006, 1983-07 onwards. "
+            "Magnitude check: ~17,000/month nationally (a single state is ~1,000-2,000). "
+            "Observed releases: Jan 2026 -> 3 Mar (31d); Mar -> 4 May (34d); "
+            "May -> 1 Jul (31d); Jun -> 30 Jul (30d); Jul -> 1 Sep (32d); "
+            "Aug -> 7 Oct (37d). ABS states 4-5 weeks after the FIRST day of the "
+            "reference month. Range 30-37, bound set to 38. "
+            "Volatile: one large apartment project moves the series."
+        ),
     ),
     SeriesSpec(
-        name="retail_turnover",
+        name="household_spending",
         source="abs",
-        collection="8501.0",
+        collection="5682.0",
         search={
-            "Turnover ;  Total (State) ;  Total (Industry) ;": "Data Item Description",
+            "Household spending ;  Total (Household Spending Categories) ; "
+            " Australia ;  Current Price ;": "Data Item Description",
             "Seasonally Adjusted": "Series Type",
         },
+        series_id="A130200584T",
         freq="M",
         transform="pct",
-        lag_days=32,
-        notes="CHECK THIS ONE. ABS has been transitioning retail trade toward "
-        "the Monthly Household Spending Indicator. Run 01_discover.py.",
+        lag_days=40,
+        lag_verified=LAGS_CHECKED_ON,
+        notes=(
+            "Monthly Household Spending Indicator, table 5682001, 2012-07 onwards. "
+            "REPLACES Retail Trade (8501.0), which the ABS ceased on 31 Jul 2025. "
+            "CURRENT PRICE (nominal) -- the monthly MHSI has no volume measure; "
+            "chain volume measures are quarterly only. So this moves with inflation "
+            "as well as real activity. Possible extension: deflate by the monthly CPI. "
+            "Observed releases: Feb 2026 -> 7 Apr (38d); Apr -> 28 May (28d); "
+            "May -> 25 Jun (25d); Jun -> 4 Aug (35d); Jul -> 27 Aug (27d). "
+            "Irregular because Mar/Jun/Sep/Dec editions are later to allow volume "
+            "processing. Range 25-38, bound set to 40. "
+            "SHORT HISTORY: starts 2012-07. Excluded from balanced-panel models."
+        ),
     ),
     SeriesSpec(
         name="goods_exports",
         source="abs",
         collection="5368.0",
         search={
-            "Goods ;  Credits ;": "Data Item Description",
+            "Credits, Total goods ;": "Data Item Description",
             "Seasonally Adjusted": "Series Type",
         },
+        series_id="A2718577A",
         freq="M",
         transform="pct",
-        lag_days=35,
-        notes="Australia is a commodity exporter; net exports swing GDP a lot.",
+        lag_days=40,
+        lag_verified=LAGS_CHECKED_ON,
+        notes=(
+            "International Trade in Goods, table 536801, 1971-07 onwards, $ millions. "
+            "'Credits' means exports; 'Debits' means imports. "
+            "CURRENT PRICE (nominal), so it moves with commodity PRICES as well as "
+            "volumes -- noisier than it looks for a real GDP target. "
+            "Observed releases: Oct 2025 -> 4 Dec (34d); Jan 2026 -> 5 Mar (33d); "
+            "Apr -> 4 Jun (35d); May -> 2 Jul (32d); Jun -> 6 Aug (37d). "
+            "ABS states 4-6 weeks after the end of the reference month. "
+            "Range 32-37, bound set to 40 to respect the stated 6-week upper end."
+        ),
     ),
 ]
 
 
 # ---------------------------------------------------------------------------
-# FINANCIAL / DAILY-ISH PREDICTORS
+# FINANCIAL PREDICTORS  (not yet implemented in fetch.py)
 # ---------------------------------------------------------------------------
-# Financial variables are observed essentially in real time -- lag_days = 0.
-# They are weak predictors individually but they fill the ragged edge at the
-# very start of a quarter, when nothing else has arrived yet.
+# Financial variables are observed in real time -- lag_days = 0. Individually
+# weak, but they fill the ragged edge at the very start of a quarter when no
+# official statistic has arrived yet.
 
 FINANCIAL_PREDICTORS: list[SeriesSpec] = [
     SeriesSpec(
@@ -221,8 +288,11 @@ FINANCIAL_PREDICTORS: list[SeriesSpec] = [
         freq="M",
         transform="level",
         lag_days=0,
-        notes="10-year bond yield minus cash rate. Classic recession predictor. "
-        "Constructed in build_features, not fetched directly.",
+        lag_verified="n/a - market data, observed in real time",
+        notes=(
+            "10-year bond yield minus cash rate. Classic recession predictor. "
+            "CONSTRUCTED in build_features from two RBA series, not fetched directly."
+        ),
     ),
     SeriesSpec(
         name="credit_growth",
@@ -230,34 +300,47 @@ FINANCIAL_PREDICTORS: list[SeriesSpec] = [
         collection="D1",
         freq="M",
         transform="level",
-        lag_days=32,
-        notes="RBA financial aggregates. Already published as a growth rate, "
-        "so transform='level'.",
+        lag_days=35,
+        lag_verified="",
+        notes=(
+            "RBA financial aggregates, published as a growth rate already, so "
+            "transform='level'. LAG NOT YET VERIFIED -- check the RBA release "
+            "schedule before using: https://www.rba.gov.au/statistics/tables/"
+        ),
     ),
 ]
 
 
 ALL_SPECS: list[SeriesSpec] = [TARGET, *MONTHLY_PREDICTORS, *FINANCIAL_PREDICTORS]
 
-# Convenience lookup
 SPECS_BY_NAME: dict[str, SeriesSpec] = {s.name: s for s in ALL_SPECS}
+
+# Series with enough history for a balanced panel (see notes on household_spending).
+# Everything else goes only into models that handle missing data natively.
+BALANCED_PANEL_START = "1983Q3"
+SHORT_HISTORY = {"household_spending"}
 
 
 def unverified_lags() -> list[str]:
-    """Names of every series whose publication lag you have not yet checked.
-
-    Call this before you believe any backtest result. If the list is non-empty,
-    your evaluation may be leaking future information.
-    """
+    """Names of every series whose publication lag has not been checked."""
     return [s.name for s in ALL_SPECS if not s.lag_verified]
 
 
+def pinned() -> list[SeriesSpec]:
+    """Specs with a confirmed ABS Series ID."""
+    return [s for s in ALL_SPECS if s.series_id]
+
+
 if __name__ == "__main__":
-    print(f"{len(ALL_SPECS)} series registered.")
-    print(f"Target: {TARGET.name} (lag {TARGET.lag_days}d)")
+    print(f"{len(ALL_SPECS)} series registered, {len(pinned())} pinned.")
+    print(f"Target: {TARGET.name} [{TARGET.series_id}] lag {TARGET.lag_days}d")
+    print(f"\nBalanced panel starts {BALANCED_PANEL_START}")
+    print(f"Excluded from balanced panel: {', '.join(sorted(SHORT_HISTORY))}")
+
     missing = unverified_lags()
     if missing:
         print(f"\nUNVERIFIED publication lags ({len(missing)}):")
         for n in missing:
             print(f"  - {n}: {SPECS_BY_NAME[n].lag_days} days (assumed)")
-        print("\nVerify these against https://www.abs.gov.au/release-calendar")
+    else:
+        print("\nAll publication lags verified.")

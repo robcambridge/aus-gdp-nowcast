@@ -45,7 +45,7 @@ def fake_quarterly(name: str, start="2018Q1", n=28) -> pd.Series:
 
 def main() -> None:
     # Use the REAL specs from config.py -- only the numbers are fake.
-    names_m = ["employment", "unemployment_rate", "retail_turnover", "building_approvals"]
+    names_m = ["employment", "unemployment_rate", "household_spending", "building_approvals"]
     series = {n: fake_monthly(n) for n in names_m}
     series["gdp_growth"] = fake_quarterly("gdp_growth")
 
