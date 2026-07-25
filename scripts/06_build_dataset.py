@@ -28,7 +28,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from ausgdp.config import BALANCED_PANEL_START, SHORT_HISTORY, SPECS_BY_NAME  # noqa: E402
 from ausgdp.dataset import as_of, ragged_edge_report  # noqa: E402
 from ausgdp.fetch import load_raw  # noqa: E402
-from ausgdp.transforms import adf_table, make_panel, transform_all  # noqa: E402
+from ausgdp.transforms import (  # noqa: E402
+    adf_table,
+    make_panel,
+    quarterly_regressor,
+    transform_series,
+)
 
 PROCESSED = Path("data/processed")
 
@@ -47,21 +52,32 @@ def main() -> None:
         print(f"Ignoring unregistered files: {', '.join(skipped)}\n")
 
     print("=" * 74)
-    print("RAW LEVELS")
+    print("RAW SERIES AS DOWNLOADED")
     print("=" * 74)
     for name, s in sorted(known.items()):
         print(f"  {name:<20} {len(s):>4} obs  {s.index[0]} to {s.index[-1]}")
 
-    # --- transform ---------------------------------------------------------
-    transformed = transform_all(known, SPECS_BY_NAME)
+    # --- build the actual model regressors ---------------------------------
+    # Monthly series stay as LEVELS in the panel. What the models actually see
+    # is the quarterly regressor: average the quarter's levels, then take the
+    # change against the previous quarter's average. We build it here at full
+    # (3-month) aggregation purely so we can test and report on it.
+    regressors = {}
+    for name, s in known.items():
+        spec = SPECS_BY_NAME[name]
+        if spec.stored_as_level:
+            regressors[name] = quarterly_regressor(s, spec.aggregation, 3)
+        else:
+            regressors[name] = transform_series(s, spec.transform)
 
     print("\n" + "=" * 74)
-    print("AFTER TRANSFORMATION")
+    print("QUARTERLY REGRESSORS  (what the models actually see)")
     print("=" * 74)
-    print(f"  {'series':<20} {'transform':<10} {'n':>5} {'mean':>8} {'sd':>8}")
-    for name, s in sorted(transformed.items()):
-        how = SPECS_BY_NAME[name].transform
-        print(f"  {name:<20} {how:<10} {len(s):>5} {s.mean():>8.3f} {s.std():>8.3f}")
+    print(f"  {'series':<20} {'construction':<16} {'n':>5} {'mean':>8} {'sd':>8}")
+    for name, s in sorted(regressors.items()):
+        spec = SPECS_BY_NAME[name]
+        how = spec.aggregation if spec.stored_as_level else spec.transform
+        print(f"  {name:<20} {how:<16} {len(s):>5} {s.mean():>8.3f} {s.std():>8.3f}")
 
     # --- stationarity ------------------------------------------------------
     print("\n" + "=" * 74)
@@ -69,7 +85,7 @@ def main() -> None:
     print("=" * 74)
     print("  Null hypothesis: the series has a unit root (is NOT stationary).")
     print("  p < 0.05 means we reject that, which is what we want.\n")
-    adf = adf_table(transformed)
+    adf = adf_table(regressors)
     print(adf.to_string(index=False))
 
     failures = adf.loc[adf["stationary_5pct"] == False]  # noqa: E712

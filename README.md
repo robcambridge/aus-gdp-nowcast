@@ -57,7 +57,7 @@ uv run python scripts/08_horse_race.py   # do the indicators help?
 src/ausgdp/config.py       Series registry + verified publication lags
 src/ausgdp/fetch.py        ABS/RBA download via readabs
 src/ausgdp/dataset.py      Long panel, Snapshot, as_of(), ragged-edge diagnostics
-src/ausgdp/transforms.py   Stationarity transforms, ADF tests, quarterly aggregation
+src/ausgdp/transforms.py   Panel prep, ADF tests, levels-to-quarterly regressors
 src/ausgdp/benchmarks.py   Benchmarks, Context, backtest, Diebold-Mariano
 src/ausgdp/bridge.py       Bridge equations and ridge on monthly indicators
 
@@ -70,7 +70,7 @@ scripts/06_build_dataset.py  Transform + build panel         (offline)
 scripts/07_benchmark.py    Benchmarks only                   (offline)
 scripts/08_horse_race.py   Full comparison at 3 vintages     (offline)
 
-tests/                     49 tests: leakage, ragged edge, transforms, backtest
+tests/                     59 tests: leakage, ragged edge, transforms, backtest
 ```
 
 ## Limitations (read before believing any result)
@@ -105,8 +105,9 @@ tests/                     49 tests: leakage, ragged edge, transforms, backtest
 - [x] Benchmarks: historical mean, random walk, AR(1), AR(p)
 - [x] Expanding-window backtest at each GDP release date
 - [x] Diebold-Mariano tests
-- [x] Bridge equations (partial-quarter consistent)
+- [x] Bridge equations (partial-quarter consistent, levels-then-growth)
 - [x] Ridge on all indicators
+- [x] Rolling-window estimation (drifting trend growth)
 - [x] RMSE by days-into-quarter
 - [ ] Dynamic factor model (`statsmodels.tsa.statespace.dynamic_factor_mq`)
 - [ ] Ridge / gradient boosting comparison

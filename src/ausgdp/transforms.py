@@ -60,18 +60,91 @@ def transform_series(series: pd.Series, how: str) -> pd.Series:
 def transform_all(
     raw: dict[str, pd.Series], specs: dict[str, SeriesSpec]
 ) -> dict[str, pd.Series]:
-    """Transform every raw series according to its SeriesSpec."""
+    """Transform every raw series according to its SeriesSpec.
+
+    Kept for direct use and testing. Note this applies `spec.transform` to
+    EVERYTHING, which is only right for quarterly series. For building the
+    panel use `prepare_for_panel` instead.
+    """
     missing = set(raw) - set(specs)
     if missing:
         raise KeyError(f"No SeriesSpec for: {sorted(missing)}")
     return {name: transform_series(s, specs[name].transform) for name, s in raw.items()}
 
 
-def make_panel(
+def prepare_for_panel(
     raw: dict[str, pd.Series], specs: dict[str, SeriesSpec]
-) -> pd.DataFrame:
-    """Full pipeline: raw levels -> transformed -> stamped long panel."""
-    return build_panel(transform_all(raw, specs), specs)
+) -> dict[str, pd.Series]:
+    """Put each series into the form the panel should store.
+
+    QUARTERLY series (the target) are transformed here: GDP growth for quarter
+    q uses q and q-1, both known when q is published, so transforming before
+    stamping is correct.
+
+    MONTHLY series are left as RAW LEVELS. Their transform happens later, after
+    quarterly aggregation, because averaging three month-on-month growth rates
+    is a different quantity from the change in the quarterly average level --
+    and the latter is how GDP itself is measured. Averaging levels first also
+    smooths out survey noise that would otherwise dominate a single month.
+    """
+    missing = set(raw) - set(specs)
+    if missing:
+        raise KeyError(f"No SeriesSpec for: {sorted(missing)}")
+
+    out = {}
+    for name, series in raw.items():
+        spec = specs[name]
+        out[name] = series.dropna() if spec.stored_as_level else transform_series(
+            series, spec.transform
+        )
+    return out
+
+
+def make_panel(raw: dict[str, pd.Series], specs: dict[str, SeriesSpec]) -> pd.DataFrame:
+    """Full pipeline: raw -> panel-ready form -> stamped long panel.
+
+    Monthly columns in the resulting panel hold LEVELS. Convert them with
+    `quarterly_regressor` (or bridge.partial_quarterly_growth) at model time.
+    """
+    return build_panel(prepare_for_panel(raw, specs), specs)
+
+
+def quarterly_regressor(
+    monthly_levels: pd.Series, aggregation: str, n_months: int = 3
+) -> pd.Series:
+    """Turn monthly levels into the quarterly regressor a bridge equation wants.
+
+    The first `n_months` of each quarter are averaged, then compared against the
+    PREVIOUS quarter's FULL three-month average:
+
+        mean_then_pct   100 * (partial_t / full_{t-1} - 1)
+        mean_then_diff  partial_t - full_{t-1}
+        mean            partial_t   (already a rate of change)
+
+    Comparing a partial current quarter against a complete previous quarter is
+    the standard bridge construction, and it is what makes a single month
+    useful: one noisy month is measured against a smooth three-month base.
+
+    Applied identically across the whole history, so estimation and prediction
+    see the same kind of number.
+    """
+    from .bridge import partial_quarterly_mean
+
+    partial = partial_quarterly_mean(monthly_levels, n_months)
+    if aggregation == "mean":
+        return partial
+
+    full = partial_quarterly_mean(monthly_levels, 3)
+    base = full.shift(1).reindex(partial.index)
+
+    if aggregation == "mean_then_pct":
+        out = (partial / base - 1) * 100
+    elif aggregation == "mean_then_diff":
+        out = partial - base
+    else:
+        raise ValueError(f"Unknown aggregation: {aggregation!r}")
+
+    return out.replace([np.inf, -np.inf], np.nan).dropna()
 
 
 # ---------------------------------------------------------------------------

@@ -101,17 +101,42 @@ def bridge_forecast(
     indicator: str,
     add_ar: bool = True,
     min_obs: int = 40,
+    window: int | None = None,
+    aggregation: str | None = None,
 ) -> float:
     """One bridge equation for one indicator.
 
     Model:   gdp_t = a + b * indicator_t (+ c * gdp_{t-1})
 
-    where indicator_t is the average of the first n months of quarter t, and n
-    is however many months of the TARGET quarter are currently available.
+    where indicator_t is built from monthly LEVELS: average the first n months
+    of quarter t, then compare against quarter t-1's full three-month average.
+    n is however many months of the TARGET quarter are currently available, and
+    the whole history is rebuilt the same way so estimation and prediction see
+    the same kind of number.
+
+    Parameters
+    ----------
+    window : if set, estimate on the last `window` quarters only.
+
+        WHY A ROLLING WINDOW MATTERS HERE
+        ---------------------------------
+        The intercept `a` absorbs average growth over the estimation sample.
+        Estimated over an expanding window back to the 1980s, it anchors on a
+        period when Australian trend growth was materially higher, and the
+        forecast inherits an upward bias. This is the same effect that makes a
+        rolling mean beat an expanding mean on this data -- so any regression
+        with a fixed intercept needs the same treatment.
+
+    add_ar : include a lag of GDP growth. Worth turning OFF when the target is
+        near white noise: an AR coefficient that is really zero still costs
+        estimation variance.
 
     Falls back to the historical mean if the indicator is missing, the target
     quarter has no months yet, or the sample is too short.
     """
+    from .config import SPECS_BY_NAME
+    from .transforms import quarterly_regressor
+
     monthly = ctx.snapshot.monthly
     if monthly.empty or indicator not in monthly.columns:
         return f_mean(ctx.y)
@@ -121,12 +146,15 @@ def bridge_forecast(
     if n_avail == 0:
         return f_mean(ctx.y)
 
-    # Rebuild history using the SAME aggregation as the target quarter.
-    x = partial_quarterly_mean(series, n_avail)
-    if ctx.target not in x.index:
+    if aggregation is None:
+        spec = SPECS_BY_NAME.get(indicator)
+        aggregation = spec.aggregation if spec else "mean_then_pct"
+
+    x = quarterly_regressor(series, aggregation, n_avail)
+    if ctx.target not in x.index or not np.isfinite(x.loc[ctx.target]):
         return f_mean(ctx.y)
 
-    x_target = x.loc[ctx.target]
+    x_target = float(x.loc[ctx.target])
     y = ctx.y
 
     frame = pd.DataFrame({"y": y, "x": x})
@@ -136,6 +164,11 @@ def bridge_forecast(
 
     if len(frame) < min_obs:
         return f_mean(ctx.y)
+
+    if window is not None:
+        frame = frame.iloc[-window:]
+        if len(frame) < min_obs:
+            return f_mean(ctx.y)
 
     cols = ["x", "y_lag"] if add_ar else ["x"]
     beta = _ols(frame[cols].to_numpy(dtype=float), frame["y"].to_numpy(dtype=float))
@@ -150,18 +183,23 @@ def bridge_forecast(
     return pred if np.isfinite(pred) else f_mean(ctx.y)
 
 
-def make_bridge(indicator: str, add_ar: bool = True):
+def make_bridge(indicator: str, add_ar: bool = True, window: int | None = None):
     """Build a named forecaster for one indicator."""
 
     def forecaster(ctx: Context) -> float:
-        return bridge_forecast(ctx, indicator, add_ar=add_ar)
+        return bridge_forecast(ctx, indicator, add_ar=add_ar, window=window)
 
     forecaster.__name__ = f"bridge_{indicator}"
-    forecaster.__doc__ = f"Bridge equation on {indicator}."
+    forecaster.__doc__ = (
+        f"Bridge equation on {indicator} "
+        f"(window={window or 'expanding'}, ar={add_ar})."
+    )
     return forecaster
 
 
-def make_bridge_average(indicators: list[str], add_ar: bool = True):
+def make_bridge_average(
+    indicators: list[str], add_ar: bool = True, window: int | None = None
+):
     """Average the forecasts of several bridge equations.
 
     Forecast combination is one of the most reliable results in the whole
@@ -171,7 +209,10 @@ def make_bridge_average(indicators: list[str], add_ar: bool = True):
     """
 
     def forecaster(ctx: Context) -> float:
-        preds = [bridge_forecast(ctx, name, add_ar=add_ar) for name in indicators]
+        preds = [
+            bridge_forecast(ctx, name, add_ar=add_ar, window=window)
+            for name in indicators
+        ]
         preds = [p for p in preds if np.isfinite(p)]
         return float(np.mean(preds)) if preds else f_mean(ctx.y)
 
@@ -180,7 +221,13 @@ def make_bridge_average(indicators: list[str], add_ar: bool = True):
     return forecaster
 
 
-def make_ridge(indicators: list[str], alpha: float = 1.0, min_obs: int = 40):
+def make_ridge(
+    indicators: list[str],
+    alpha: float = 1.0,
+    min_obs: int = 40,
+    window: int | None = None,
+    add_ar: bool = True,
+):
     """Ridge regression on all indicators at once, plus a lag of GDP.
 
     Bridges use one indicator each; this uses them jointly. Ridge rather than
@@ -195,6 +242,9 @@ def make_ridge(indicators: list[str], alpha: float = 1.0, min_obs: int = 40):
         from sklearn.linear_model import Ridge
         from sklearn.pipeline import make_pipeline
         from sklearn.preprocessing import StandardScaler
+
+        from .config import SPECS_BY_NAME
+        from .transforms import quarterly_regressor
 
         monthly = ctx.snapshot.monthly
         if monthly.empty:
@@ -211,23 +261,35 @@ def make_ridge(indicators: list[str], alpha: float = 1.0, min_obs: int = 40):
         if n_avail == 0:
             return f_mean(ctx.y)
 
-        cols = {c: partial_quarterly_mean(monthly[c].dropna(), n_avail) for c in available}
+        cols = {}
+        for c in available:
+            spec = SPECS_BY_NAME.get(c)
+            agg = spec.aggregation if spec else "mean_then_pct"
+            cols[c] = quarterly_regressor(monthly[c].dropna(), agg, n_avail)
+
         X = pd.DataFrame(cols)
         if ctx.target not in X.index:
             return f_mean(ctx.y)
 
         frame = X.join(ctx.y.rename("y"), how="inner")
-        frame["y_lag"] = ctx.y.shift(1)
+        if add_ar:
+            frame["y_lag"] = ctx.y.shift(1)
         frame = frame.dropna()
         if len(frame) < min_obs:
             return f_mean(ctx.y)
 
-        features = [*available, "y_lag"]
+        if window is not None:
+            frame = frame.iloc[-window:]
+            if len(frame) < min_obs:
+                return f_mean(ctx.y)
+
+        features = [*available, "y_lag"] if add_ar else list(available)
         model = make_pipeline(StandardScaler(), Ridge(alpha=alpha))
         model.fit(frame[features].to_numpy(dtype=float), frame["y"].to_numpy(dtype=float))
 
         target_row = X.loc[[ctx.target]].copy()
-        target_row["y_lag"] = float(ctx.y.iloc[-1])
+        if add_ar:
+            target_row["y_lag"] = float(ctx.y.iloc[-1])
         if target_row[features].isna().any(axis=None):
             return f_mean(ctx.y)
 

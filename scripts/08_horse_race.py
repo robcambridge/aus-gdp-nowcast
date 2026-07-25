@@ -35,19 +35,43 @@ PROCESSED = Path("data/processed")
 FIGURES = Path("outputs/figures")
 
 # Days after the GDP release at which to form the nowcast.
-#   0  = the morning GDP is published; ~1 month of the target quarter is known
-#   30 = a month later; ~2 months known
-#   60 = two months later; the target quarter is over and fully measured,
-#        but its GDP is still ~1 month from publication
-OFFSETS = [0, 30, 60]
+#
+# Publication-lag arithmetic, counting from the end of the PREVIOUS quarter:
+#   the GDP release lands on day 65; the target quarter ends on day 91;
+#   its own GDP is not published until day 156.
+# So a vintage at offset d sits on day 65 + d, and any d up to ~90 is safe.
+#
+#   0  = GDP release morning (day 65). Only labour force has any of the
+#        target quarter; slower indicators have nothing at all.
+#   30 = day 95. Target quarter just ended.
+#   60 = day 125. Labour force complete, but building approvals (month 3
+#        arrives day 129) and exports (day 131) are still one month short.
+#   80 = day 145. EVERY indicator complete, still 11 days before GDP.
+OFFSETS = [0, 30, 60, 80]
+
+# Estimation window for the regression models, in quarters.
+# 40 quarters = 10 years, matching the rolling_mean benchmark. Chosen a priori
+# for the same reason: a fixed intercept estimated back to the 1980s anchors on
+# a period of higher trend growth and biases forecasts upward.
+WINDOW = 40
 
 
 def build_models(indicators: list[str]) -> dict:
+    """Benchmarks, plus bridges estimated on a rolling window without an AR term.
+
+    The AR term is dropped because ar1 was not significantly better than the
+    mean on this data (p = 0.30): a coefficient that is really zero still costs
+    estimation variance. `bridge_average_expanding` keeps the original
+    specification so the effect of both choices stays visible.
+    """
     models = dict(BENCHMARKS)
     for name in indicators:
-        models[f"bridge_{name}"] = make_bridge(name)
-    models["bridge_average"] = make_bridge_average(indicators)
-    models["ridge"] = make_ridge(indicators)
+        models[f"bridge_{name}"] = make_bridge(name, add_ar=False, window=WINDOW)
+    models["bridge_average"] = make_bridge_average(
+        indicators, add_ar=False, window=WINDOW
+    )
+    models["bridge_avg_expanding"] = make_bridge_average(indicators, add_ar=True)
+    models["ridge"] = make_ridge(indicators, window=WINDOW, add_ar=False)
     return models
 
 

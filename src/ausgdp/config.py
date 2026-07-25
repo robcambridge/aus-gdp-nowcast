@@ -47,6 +47,7 @@ from typing import Literal
 
 Freq = Literal["M", "Q"]
 Transform = Literal["level", "pct", "diff", "log_pct"]
+Aggregation = Literal["mean_then_pct", "mean_then_diff", "mean"]
 
 # Date on which the publication lags below were checked against the ABS calendar.
 LAGS_CHECKED_ON = "2026-07-24"
@@ -67,8 +68,28 @@ class SeriesSpec:
     series_id   Exact ABS Series ID, confirmed via scripts/01_discover.py.
     freq        Native frequency. Do NOT pre-aggregate monthly data to
                 quarterly; the whole point is to keep the monthly timing.
-    transform   How to make it stationary. "pct" = percent change on previous
-                period, "diff" = first difference, "level" = leave it alone.
+    transform   QUARTERLY series only. Applied before the series enters the
+                panel, because a quarterly series needs no aggregation.
+                "pct" = percent change on previous quarter.
+    aggregation MONTHLY series only. How to get from monthly LEVELS to a
+                quarterly regressor, applied at model time:
+                  "mean_then_pct"  average levels over the quarter, then take
+                                   the change vs the previous quarter's average
+                                   (employment, hours, approvals, exports)
+                  "mean_then_diff" average the rate over the quarter, then
+                                   difference (unemployment rate, cash rate)
+                  "mean"           average only; already a rate of change
+                                   (RBA credit growth, term spread)
+
+                WHY THE TWO STAGES DIFFER
+                -------------------------
+                Monthly series stay as LEVELS in the panel. Averaging three
+                month-on-month growth rates is NOT the same quantity as the
+                change in the quarterly average level -- and GDP itself is
+                measured the second way. Averaging first also smooths survey
+                noise: a single month-on-month employment change is mostly
+                noise, whereas a quarterly average compared against the
+                previous quarter's average is far more stable.
     lag_days    Conservative upper bound on days between the END of the
                 reference period and publication.
     lag_verified  Date the lag was checked against the official calendar.
@@ -83,6 +104,7 @@ class SeriesSpec:
     series_id: str = ""
     freq: Freq = "M"
     transform: Transform = "pct"
+    aggregation: Aggregation = "mean_then_pct"
     lag_days: int = 30
     lag_verified: str = ""
     notes: str = ""
@@ -90,6 +112,11 @@ class SeriesSpec:
     @property
     def is_target(self) -> bool:
         return self.name == "gdp_growth"
+
+    @property
+    def stored_as_level(self) -> bool:
+        """Monthly series enter the panel untransformed, as raw levels."""
+        return self.freq == "M"
 
 
 # ---------------------------------------------------------------------------
@@ -144,6 +171,7 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         },
         series_id="A84423043C",
         freq="M",
+        aggregation="mean_then_pct",
         transform="pct",
         lag_days=26,
         lag_verified=LAGS_CHECKED_ON,
@@ -159,6 +187,7 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         },
         series_id="A84423050A",
         freq="M",
+        aggregation="mean_then_diff",
         transform="diff",
         lag_days=26,
         lag_verified=LAGS_CHECKED_ON,
@@ -177,6 +206,7 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         },
         series_id="A84426277X",
         freq="M",
+        aggregation="mean_then_pct",
         transform="pct",
         lag_days=26,
         lag_verified=LAGS_CHECKED_ON,
@@ -196,6 +226,7 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         },
         series_id="A422070J",
         freq="M",
+        aggregation="mean_then_pct",
         transform="pct",
         lag_days=38,
         lag_verified=LAGS_CHECKED_ON,
@@ -220,6 +251,7 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         },
         series_id="A130200584T",
         freq="M",
+        aggregation="mean_then_pct",
         transform="pct",
         lag_days=40,
         lag_verified=LAGS_CHECKED_ON,
@@ -246,6 +278,7 @@ MONTHLY_PREDICTORS: list[SeriesSpec] = [
         },
         series_id="A2718577A",
         freq="M",
+        aggregation="mean_then_pct",
         transform="pct",
         lag_days=40,
         lag_verified=LAGS_CHECKED_ON,
@@ -276,6 +309,7 @@ FINANCIAL_PREDICTORS: list[SeriesSpec] = [
         source="rba",
         collection="OCR",
         freq="M",
+        aggregation="mean_then_diff",
         transform="diff",
         lag_days=0,
         lag_verified="n/a - policy rate is public the day it is set",
@@ -286,6 +320,7 @@ FINANCIAL_PREDICTORS: list[SeriesSpec] = [
         source="rba",
         collection="F2",
         freq="M",
+        aggregation="mean",
         transform="level",
         lag_days=0,
         lag_verified="n/a - market data, observed in real time",
@@ -299,6 +334,7 @@ FINANCIAL_PREDICTORS: list[SeriesSpec] = [
         source="rba",
         collection="D1",
         freq="M",
+        aggregation="mean",
         transform="level",
         lag_days=35,
         lag_verified="",
