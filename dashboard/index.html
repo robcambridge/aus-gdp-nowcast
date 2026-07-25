@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Australian GDP Nowcast</title>
+<style>
+  :root {
+    --ink: #0a0e14;
+    --panel: #121821;
+    --panel-2: #0e141c;
+    --line: #1f2a37;
+    --grid: #17212e;
+    --text: #c7d1dc;
+    --dim: #6b7a8d;
+    --bright: #f0f4f8;
+    --signal: #4bd0a0;   /* the nowcast / positive */
+    --warn: #e8875a;     /* negative surprises */
+    --accent: #5aa9e8;   /* actual line */
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--ink);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    padding: 0 0 80px;
+  }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* Masthead */
+  header {
+    border-bottom: 1px solid var(--line);
+    padding: 28px 0 22px;
+    margin-bottom: 34px;
+  }
+  .eyebrow {
+    font-size: 11px; letter-spacing: 0.28em; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 10px;
+  }
+  h1 {
+    font-family: var(--sans);
+    font-size: 30px; font-weight: 640; letter-spacing: -0.02em;
+    color: var(--bright); line-height: 1.1;
+  }
+  .sub { color: var(--dim); margin-top: 8px; font-size: 13px; }
+  .sub b { color: var(--text); font-weight: 500; }
+
+  /* Hero nowcast */
+  .hero {
+    display: grid; grid-template-columns: 1.1fr 1fr; gap: 1px;
+    background: var(--line); border: 1px solid var(--line);
+    border-radius: 10px; overflow: hidden; margin-bottom: 34px;
+  }
+  .hero > div { background: var(--panel); padding: 26px 28px; }
+  .hero-label {
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--dim); margin-bottom: 14px;
+  }
+  .bignum {
+    font-size: 68px; font-weight: 300; letter-spacing: -0.03em;
+    color: var(--signal); line-height: 0.95; font-variant-numeric: tabular-nums;
+  }
+  .bignum .pct { font-size: 30px; color: var(--dim); margin-left: 4px; }
+  .hero-meta { margin-top: 16px; color: var(--dim); font-size: 12.5px; }
+  .hero-meta .q { color: var(--text); }
+  .prevbox { display: flex; flex-direction: column; justify-content: center; }
+  .prev-row { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 9px 0; border-bottom: 1px dotted var(--line); }
+  .prev-row:last-child { border-bottom: 0; }
+  .prev-row .k { color: var(--dim); font-size: 12.5px; }
+  .prev-row .v { color: var(--text); font-variant-numeric: tabular-nums; }
+
+  /* Section heads */
+  .sec-head { display: flex; align-items: baseline; gap: 12px; margin: 6px 0 16px; }
+  .sec-num { color: var(--signal); font-size: 12px; }
+  .sec-title { font-family: var(--sans); font-size: 16px; font-weight: 600;
+    color: var(--bright); letter-spacing: -0.01em; }
+  .sec-note { color: var(--dim); font-size: 12px; margin-left: auto; }
+  section { margin-bottom: 40px; }
+
+  /* Charts */
+  .chart-card { background: var(--panel); border: 1px solid var(--line);
+    border-radius: 10px; padding: 22px 24px; }
+  svg { display: block; width: 100%; height: auto; }
+  .axis { stroke: var(--grid); stroke-width: 1; }
+  .axis-text { fill: var(--dim); font-size: 10px; font-family: var(--mono); }
+  .gridline { stroke: var(--grid); stroke-width: 1; stroke-dasharray: 2 4; }
+
+  /* Leaderboard */
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th { text-align: right; font-weight: 500; color: var(--dim); font-size: 11px;
+    letter-spacing: 0.08em; text-transform: uppercase; padding: 0 14px 12px;
+    border-bottom: 1px solid var(--line); }
+  th:first-child { text-align: left; }
+  td { padding: 11px 14px; text-align: right; border-bottom: 1px solid var(--grid); }
+  td:first-child { text-align: left; color: var(--text); }
+  tr:last-child td { border-bottom: 0; }
+  .row-best td { background: rgba(75,208,160,0.06); }
+  .row-best td:first-child { color: var(--signal); font-weight: 500; }
+  .badge { font-size: 10px; padding: 2px 7px; border-radius: 4px; margin-left: 8px;
+    background: rgba(75,208,160,0.14); color: var(--signal); letter-spacing: 0.04em; }
+  .pos { color: var(--signal); }
+  .neg { color: var(--warn); }
+  .dim { color: var(--dim); }
+
+  /* News waterfall */
+  .news-row { display: grid; grid-template-columns: 130px 1fr 72px; gap: 14px;
+    align-items: center; padding: 8px 0; }
+  .news-name { color: var(--text); font-size: 12.5px; }
+  .news-name span { color: var(--dim); font-size: 11px; }
+  .news-bar-track { position: relative; height: 20px; }
+  .news-bar-mid { position: absolute; left: 50%; top: -3px; bottom: -3px;
+    width: 1px; background: var(--line); }
+  .news-bar { position: absolute; top: 3px; height: 14px; border-radius: 2px; }
+  .news-val { text-align: right; font-variant-numeric: tabular-nums; font-size: 12.5px; }
+
+  .caption { color: var(--dim); font-size: 12px; margin-top: 14px; line-height: 1.6; }
+  .legend { display: flex; gap: 18px; margin-top: 14px; font-size: 11.5px; color: var(--dim); }
+  .legend i { display: inline-block; width: 18px; height: 2px; vertical-align: middle;
+    margin-right: 6px; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 20px; color: var(--dim);
+    font-size: 11.5px; line-height: 1.7; }
+  footer a { color: var(--accent); text-decoration: none; }
+  .disclaimer { background: var(--panel-2); border: 1px solid var(--line);
+    border-left: 2px solid var(--warn); border-radius: 6px; padding: 13px 16px;
+    color: var(--dim); font-size: 12px; margin-top: 16px; line-height: 1.6; }
+  .loading { color: var(--dim); padding: 60px 0; text-align: center; }
+
+  @media (max-width: 720px) {
+    .hero { grid-template-columns: 1fr; }
+    .bignum { font-size: 54px; }
+    h1 { font-size: 23px; }
+    .news-row { grid-template-columns: 96px 1fr 60px; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Point-in-time macro nowcasting &middot; RBA / ABS data</div>
+    <h1>Australian GDP Nowcast</h1>
+    <div class="sub" id="asof">Loading current vintage&hellip;</div>
+  </header>
+
+  <div id="app"><div class="loading">Loading dashboard data&hellip;</div></div>
+
+  <footer>
+    <p>Real quarterly GDP, chain volume measures, seasonally adjusted (ABS 5206.0),
+    nowcast from monthly ABS/RBA indicators using point-in-time data — every value
+    dated by its actual publication so the backtest never sees the future.</p>
+    <div class="disclaimer" id="disclaimer"></div>
+  </footer>
+</div>
+
+<script>
+const F = (x, d=2) => (x==null||isNaN(x)) ? "—" : (x>=0?"+":"") + Number(x).toFixed(d);
+const el = (t, c, h) => { const e=document.createElement(t); if(c)e.className=c; if(h!=null)e.innerHTML=h; return e; };
+
+function niceName(m){
+  return m.replace(/^bridge_/,"bridge · ").replace(/_/g," ")
+          .replace("dfm 1f all","factor model (all)").replace("dfm 1f","factor model")
+          .replace("ar aic","AR(p)").replace("ar1","AR(1)");
+}
+
+async function main(){
+  let data;
+  try { data = await (await fetch("data.json")).json(); }
+  catch(e){ document.getElementById("app").innerHTML =
+    '<div class="loading">Could not load data.json. Run scripts 06–11 first, then serve this folder.</div>'; return; }
+
+  const live = data.live || {};
+  document.getElementById("asof").innerHTML =
+    `As of <b>${live.as_of||"—"}</b> · nowcasting <b>${live.target_quarter||"—"}</b>, ` +
+    `not yet published by the ABS`;
+
+  const app = document.getElementById("app");
+  app.innerHTML = "";
+
+  /* ---- HERO ---- */
+  const hero = el("div","hero");
+  const head = live.headline_nowcast;
+  const left = el("div","");
+  left.innerHTML =
+    `<div class="hero-label">Headline nowcast · ${live.target_quarter||""}</div>
+     <div class="bignum">${F(head)}<span class="pct">%</span></div>
+     <div class="hero-meta">quarter-on-quarter real GDP growth<br>
+     model: <span class="q">rolling-window bridge average</span></div>`;
+  const right = el("div","prevbox");
+  const fc = live.forecasts||{};
+  const picks = ["bridge_average","dfm_1f","ridge","rolling_mean","ar1"];
+  right.innerHTML = `<div class="hero-label">Cross-check · other models</div>` +
+    picks.filter(m=>fc[m]!=null).map(m=>
+      `<div class="prev-row"><span class="k">${niceName(m)}</span>
+       <span class="v">${F(fc[m])}%</span></div>`).join("");
+  hero.append(left,right);
+  app.append(hero);
+
+  /* ---- VINTAGE CURVE (hero chart) ---- */
+  if (data.vintage_curve && Object.keys(data.vintage_curve).length){
+    app.append(sectionHead("01","Accuracy as data arrives",
+      "RMSE by days after the prior GDP release · 1993–2019"));
+    const card = el("div","chart-card");
+    card.appendChild(vintageChart(data.vintage_curve));
+    const lg = el("div","legend");
+    lg.innerHTML =
+      `<span><i style="background:var(--signal)"></i>bridge average (headline)</span>
+       <span><i style="background:var(--dim)"></i>other models</span>
+       <span><i style="background:var(--accent);border-top:1px dashed"></i>rolling-mean benchmark</span>`;
+    card.appendChild(lg);
+    card.appendChild(el("div","caption",
+      "Lower is better. The headline model falls as more monthly data arrives — "+
+      "the signature of a working nowcast. Flat lines are models that ignore the "+
+      "monthly indicators."));
+    app.append(card);
+  }
+
+  /* ---- LEADERBOARD ---- */
+  if (data.leaderboard && data.leaderboard.length){
+    app.append(sectionHead("02","Model horse race",
+      "out-of-sample · richest vintage · 1993–2019"));
+    const card = el("div","chart-card");
+    card.appendChild(leaderboard(data.leaderboard));
+    card.appendChild(el("div","caption",
+      "RMSE and MAE in percentage points of quarterly growth. Improvement is versus "+
+      "the rolling-mean benchmark. The gap is small and not statistically significant "+
+      "(Diebold–Mariano p≈0.17) — an honest result: standard indicators offer limited "+
+      "uplift for Australian GDP at one quarter, and the flexible models do not win."));
+    app.append(card);
+  }
+
+  /* ---- ACTUAL VS PREDICTED ---- */
+  if (data.series && data.series.quarters){
+    app.append(sectionHead("03","Nowcast vs outcome",
+      `${data.series.quarters[0]} – ${data.series.quarters.slice(-1)[0]}`));
+    const card = el("div","chart-card");
+    card.appendChild(lineChart(data.series));
+    const lg = el("div","legend");
+    lg.innerHTML =
+      `<span><i style="background:var(--accent)"></i>actual GDP growth</span>
+       <span><i style="background:var(--signal)"></i>bridge-average nowcast</span>`;
+    card.appendChild(lg);
+    app.append(card);
+  }
+
+  /* ---- NEWS ---- */
+  if (data.news && data.news.length){
+    app.append(sectionHead("04","What moved the nowcast",
+      "factor-model news decomposition"));
+    const card = el("div","chart-card");
+    card.appendChild(newsBlock(data.news));
+    card.appendChild(el("div","caption",
+      "Each monthly release surprised the model by <b>news</b> (observed minus expected); "+
+      "the Kalman filter weighted it, moving the nowcast by <b>impact</b>. This is what "+
+      "a central-bank nowcasting desk publishes — the model as an explanation, not a black box."));
+    app.append(card);
+  }
+
+  document.getElementById("disclaimer").innerHTML =
+    "Final-vintage data (latest revised figures), so measured accuracy is optimistic "+
+    "versus a true real-time system. Publication lags are conservative upper bounds "+
+    "verified against the ABS release calendar. Not investment advice — a personal "+
+    "research project.";
+}
+
+function sectionHead(n,t,note){
+  const h = el("div","sec-head");
+  h.innerHTML = `<span class="sec-num">${n}</span><span class="sec-title">${t}</span>`+
+                `<span class="sec-note">${note||""}</span>`;
+  return h;
+}
+
+/* ---------- charts (hand-rolled SVG, no libraries) ---------- */
+function vintageChart(curve){
+  const W=1000,H=340,P={t:20,r:20,b:40,l:52};
+  const models=Object.keys(curve);
+  let offs=new Set(), lo=Infinity, hi=-Infinity;
+  models.forEach(m=>{curve[m].offsets.forEach(o=>offs.add(o));
+    curve[m].rmse.forEach(v=>{lo=Math.min(lo,v);hi=Math.max(hi,v);});});
+  offs=[...offs].sort((a,b)=>a-b);
+  const pad=(hi-lo)*0.15||0.05; lo-=pad; hi+=pad;
+  const x=o=>P.l+(o-offs[0])/((offs.at(-1)-offs[0])||1)*(W-P.l-P.r);
+  const y=v=>P.t+(1-(v-lo)/(hi-lo))*(H-P.t-P.b);
+  const svg=svgEl(W,H);
+  // gridlines
+  for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4, yy=y(v);
+    svg.append(line(P.l,yy,W-P.r,yy,"gridline"));
+    svg.append(txt(P.l-8,yy+3,v.toFixed(2),"axis-text","end"));}
+  offs.forEach(o=>svg.append(txt(x(o),H-P.b+16,o+"d","axis-text","middle")));
+  svg.append(txt(P.l-38,P.t+6,"RMSE","axis-text","start"));
+  // series
+  const draw=(m,color,w,dash)=>{
+    const pts=curve[m].offsets.map((o,i)=>[x(o),y(curve[m].rmse[i])]);
+    svg.append(path(pts,color,w,dash));
+    if(m==="bridge_average") pts.forEach(p=>svg.append(dot(p[0],p[1],color)));
+  };
+  models.forEach(m=>{ if(m!=="bridge_average"&&m!=="rolling_mean")
+    draw(m,"#3a4a5c",1.3,null); });
+  if(curve.rolling_mean) draw("rolling_mean","#5aa9e8",1.6,"5 4");
+  if(curve.bridge_average) draw("bridge_average","#4bd0a0",2.6,null);
+  return svg;
+}
+
+function lineChart(s){
+  const W=1000,H=300,P={t:18,r:16,b:34,l:46};
+  const n=s.quarters.length;
+  const all=s.actual.concat(s.predicted).filter(v=>v!=null);
+  let lo=Math.min(...all),hi=Math.max(...all); const pad=(hi-lo)*0.1||1; lo-=pad;hi+=pad;
+  const x=i=>P.l+i/((n-1)||1)*(W-P.l-P.r);
+  const y=v=>P.t+(1-(v-lo)/(hi-lo))*(H-P.t-P.b);
+  const svg=svgEl(W,H);
+  const zero=y(0);
+  svg.append(line(P.l,zero,W-P.r,zero,"axis"));
+  for(let i=0;i<=4;i++){const v=lo+(hi-lo)*i/4,yy=y(v);
+    svg.append(txt(P.l-8,yy+3,v.toFixed(1),"axis-text","end"));}
+  for(let i=0;i<n;i+=Math.ceil(n/8)) svg.append(txt(x(i),H-P.b+16,s.quarters[i],"axis-text","middle"));
+  svg.append(path(s.actual.map((v,i)=>[x(i),y(v)]),"#5aa9e8",1.7));
+  svg.append(path(s.predicted.map((v,i)=>[x(i),y(v)]),"#4bd0a0",1.5,"4 3"));
+  return svg;
+}
+
+function leaderboard(rows){
+  const t=el("table");
+  t.innerHTML="<thead><tr><th>Model</th><th>RMSE</th><th>MAE</th><th>Bias</th><th>vs benchmark</th></tr></thead>";
+  const tb=el("tbody");
+  rows.forEach((r,i)=>{
+    const tr=el("tr", i===0?"row-best":"");
+    const imp=r.improvement_vs_benchmark;
+    const impCell = imp==null ? '<span class="dim">—</span>'
+      : imp>0 ? `<span class="pos">${imp}% better</span>`
+      : imp<0 ? `<span class="neg">${Math.abs(imp)}% worse</span>`
+      : '<span class="dim">baseline</span>';
+    tr.innerHTML =
+      `<td>${niceName(r.model)}${i===0?'<span class="badge">BEST</span>':''}</td>`+
+      `<td>${r.rmse.toFixed(4)}</td><td>${r.mae.toFixed(4)}</td>`+
+      `<td>${F(r.bias,3)}</td><td>${impCell}</td>`;
+    tb.append(tr);
+  });
+  t.append(tb); return t;
+}
+
+function newsBlock(rows){
+  const box=el("div","");
+  const mx=Math.max(...rows.map(r=>Math.abs(r.impact)),0.001);
+  rows.forEach(r=>{
+    const row=el("div","news-row");
+    const w=Math.abs(r.impact)/mx*50;
+    const pos=r.impact>=0;
+    row.innerHTML =
+      `<div class="news-name">${r.indicator.replace(/_/g," ")}<br><span>${r.month}</span></div>
+       <div class="news-bar-track"><div class="news-bar-mid"></div>
+         <div class="news-bar" style="${pos?'left:50%':'right:50%'};width:${w}%;
+           background:${pos?'var(--signal)':'var(--warn)'}"></div></div>
+       <div class="news-val ${pos?'pos':'neg'}">${F(r.impact,3)}</div>`;
+    box.append(row);
+  });
+  return box;
+}
+
+/* svg helpers */
+function svgEl(w,h){const s=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  s.setAttribute("viewBox",`0 0 ${w} ${h}`); s.setAttribute("preserveAspectRatio","xMidYMid meet");
+  return s;}
+function line(x1,y1,x2,y2,c){const l=document.createElementNS("http://www.w3.org/2000/svg","line");
+  l.setAttribute("x1",x1);l.setAttribute("y1",y1);l.setAttribute("x2",x2);l.setAttribute("y2",y2);
+  if(c)l.setAttribute("class",c);return l;}
+function txt(x,y,s,c,anchor){const t=document.createElementNS("http://www.w3.org/2000/svg","text");
+  t.setAttribute("x",x);t.setAttribute("y",y);if(c)t.setAttribute("class",c);
+  if(anchor)t.setAttribute("text-anchor",anchor);t.textContent=s;return t;}
+function path(pts,color,w,dash){const p=document.createElementNS("http://www.w3.org/2000/svg","path");
+  p.setAttribute("d",pts.map((pt,i)=>(i?"L":"M")+pt[0]+" "+pt[1]).join(" "));
+  p.setAttribute("fill","none");p.setAttribute("stroke",color);p.setAttribute("stroke-width",w);
+  p.setAttribute("stroke-linejoin","round");if(dash)p.setAttribute("stroke-dasharray",dash);return p;}
+function dot(x,y,c){const e=document.createElementNS("http://www.w3.org/2000/svg","circle");
+  e.setAttribute("cx",x);e.setAttribute("cy",y);e.setAttribute("r",3.2);e.setAttribute("fill",c);return e;}
+
+main();
+</script>
+</body>
+</html>

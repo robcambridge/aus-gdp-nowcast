@@ -1,120 +1,138 @@
-# Australian GDP Nowcasting
+# Australian GDP Nowcasting System
 
-Point-in-time nowcasting of Australian quarterly real GDP growth using monthly
-ABS and RBA indicators.
+A point-in-time nowcasting system for Australian quarterly real GDP growth,
+built from monthly ABS and RBA indicators. Includes a backtesting framework, a
+model horse race, a mixed-frequency dynamic factor model with news
+decomposition, a live current-quarter nowcast, and a browser dashboard.
 
-**Status:** Phase 3. Bridges and a dynamic factor model implemented and evaluated.
+**Live headline:** a rolling-window combination of bridge equations nowcasts the
+current (unpublished) quarter, cross-checked against a dynamic factor model and
+univariate benchmarks.
 
 ---
 
 ## The problem, stated precisely
 
-The ABS publishes quarterly GDP roughly nine weeks after the quarter ends — the
-June quarter lands in early September. So at the moment GDP for quarter *t* is
-released, quarter *t+1* is already over but unmeasured.
+The ABS publishes quarterly GDP about nine weeks after the quarter ends — the
+June quarter lands in early September. So when GDP for quarter *t* is released,
+quarter *t+1* is already over but unmeasured. This system nowcasts *t+1* using
+only data published on or before a given date — the way the RBA and Treasury
+actually operate.
 
-This project forecasts **quarter *t+1* growth, using only information published
-on or before a given date**. That is a nowcast of a completed-but-unpublished
-quarter, which is what the RBA and Treasury actually do, and it is the version
-of the problem where monthly indicators can add value over a univariate
-benchmark.
-
-## Why the plumbing comes first
+## Why point-in-time is the whole game
 
 The informational edge comes from monthly data arriving before GDP does. That
 edge is only real if the backtest respects **when each number was actually
-published**. Every observation in this project carries an `available_from`
-date, and snapshots are constructed by filtering on it — so look-ahead bias is
-structurally prevented rather than manually avoided.
+published**. Every observation carries an `available_from` date, and snapshots
+are built by filtering on it, so look-ahead bias is structurally impossible
+rather than something to remember. Publication lags are conservative upper
+bounds verified against the ABS release calendar; each lag records the observed
+release dates behind it in `config.py`.
 
-```
-series      ref_period  ref_end     value  available_from
-employment  2024-07     2024-07-31   14.2  2024-08-17
-employment  2024-08     2024-08-31   14.3  2024-09-17
-gdp_growth  2024Q2      2024-06-30    0.3  2024-09-03
-```
+## Headline result
 
-`as_of(panel, "2024-09-03")` returns only rows published by that date. Because
-series publish at different speeds, the bottom edge is a staircase — the
-**ragged edge**.
+On an out-of-sample backtest (1993–2019, one nowcast per GDP release):
 
-## Setup
+- A **rolling-window average of bridge equations** is the most accurate model,
+  ~2.5% better than a rolling-mean benchmark, with accuracy improving as more
+  monthly data arrives through the quarter.
+- The improvement is **not statistically significant** (Diebold–Mariano
+  p ≈ 0.17).
+- A **mixed-frequency dynamic factor model** does not beat the simpler
+  combination, and adding a short-history spending series does not help.
+
+The honest conclusion: standard monthly indicators offer limited, non-significant
+uplift for Australian GDP at a one-quarter horizon, and flexible models do not
+outperform simple ones on a ~130-quarter sample. The framework is built so that
+this is a credible finding rather than a disappointing one.
+
+## Quickstart
 
 ```bash
-uv sync                                  # install dependencies
-uv run python scripts/02_demo_ragged_edge.py   # synthetic demo, no network
-uv run pytest                            # 9 tests, including a leakage check
-uv run python scripts/01_discover.py     # find real ABS series IDs
-uv run python scripts/05_check_series.py # download and verify
-uv run python scripts/06_build_dataset.py
-uv run python scripts/07_benchmark.py    # the number to beat
-uv run python scripts/08_horse_race.py   # do the indicators help?
+uv sync
+uv run pytest                              # 69 tests
+
+# one-time: confirm ABS series IDs, then download
+uv run python scripts/01_discover.py
+uv run python scripts/05_check_series.py
+
+# build + evaluate
+uv run python scripts/06_build_dataset.py  # point-in-time panel
+uv run python scripts/07_benchmark.py      # benchmarks
+uv run python scripts/08_horse_race.py     # full horse race (incl. DFM, slow)
+uv run python scripts/09_news.py           # news decomposition
+uv run python scripts/10_live_nowcast.py   # current-quarter nowcast
+uv run python scripts/11_build_dashboard_data.py
+
+# or chain them all
+uv run python scripts/run_all.py
+
+# view the dashboard
+python -m http.server -d dashboard 8000    # then open localhost:8000
 ```
+
+## The dashboard
+
+`dashboard/index.html` is a static page (no server, no build step) that reads
+`dashboard/data.json`. It shows the live nowcast, the accuracy-by-vintage curve,
+the model horse race, nowcast-vs-outcome over history, and the news
+decomposition. Deployable as-is to GitHub Pages.
+
+## Models
+
+| Model | Idea |
+|---|---|
+| mean / rolling mean | historical average of GDP growth |
+| random walk | next quarter = this quarter |
+| AR(1) / AR(p) | GDP's own past only |
+| bridge equations | regress GDP on each monthly indicator's quarterly reading |
+| **bridge average** | equal-weight combination of bridges (headline) |
+| ridge | all indicators jointly, shrinkage |
+| dynamic factor model | pool all indicators through a latent factor (Kalman/EM) |
 
 ## Layout
 
 ```
-src/ausgdp/config.py       Series registry + verified publication lags
-src/ausgdp/fetch.py        ABS/RBA download via readabs
-src/ausgdp/dataset.py      Long panel, Snapshot, as_of(), ragged-edge diagnostics
-src/ausgdp/transforms.py   Panel prep, ADF tests, levels-to-quarterly regressors
-src/ausgdp/benchmarks.py   Benchmarks, Context, backtest, Diebold-Mariano
-src/ausgdp/bridge.py       Bridge equations and ridge on monthly indicators
-src/ausgdp/factor.py       Mixed-frequency dynamic factor model (Kalman/EM)
-
-scripts/01_discover.py     Confirm ABS series IDs            (network)
-scripts/02_demo_*.py       Offline demo of point-in-time logic
-scripts/03_search_meta.py  Search downloaded ABS metadata    (offline)
-scripts/04_list_catalogues.py  Find ABS collections          (network)
-scripts/05_check_series.py Verify pinned series, save raw    (network)
-scripts/06_build_dataset.py  Transform + build panel         (offline)
-scripts/07_benchmark.py    Benchmarks only                   (offline)
-scripts/08_horse_race.py   Full comparison at 3 vintages     (offline)
-
-tests/                     67 tests: leakage, ragged edge, transforms, backtest
+src/ausgdp/
+  config.py       series registry + verified publication lags
+  fetch.py        ABS/RBA download via readabs
+  dataset.py      long panel, Snapshot, as_of(), ragged-edge diagnostics
+  transforms.py   panel prep, ADF tests, levels-to-quarterly regressors
+  benchmarks.py   Context, backtest, Diebold-Mariano, benchmark models
+  bridge.py       bridge equations, ridge, forecast combination
+  factor.py       mixed-frequency dynamic factor model + news decomposition
+scripts/          01-11 pipeline + run_all.py
+dashboard/        static HTML dashboard + data.json
+tests/            69 tests: leakage, ragged edge, transforms, models, news
 ```
 
-## Limitations (read before believing any result)
+## Method notes worth reading
 
-1. **Publication lags are conservative upper bounds, held constant.**
-   Verified against the [ABS release calendar](https://www.abs.gov.au/release-calendar)
-   on 2026-07-24; observed release dates are recorded in `config.py`. Each lag is
-   set to the longest recently observed delay plus a buffer, so the model
-   occasionally discards data it could legitimately have used. Measured accuracy
-   is therefore a **lower bound** on real-time performance. Lags are also held
-   constant across the sample, though ABS releases were slower historically.
+- **Bridge construction.** Monthly indicators enter the panel as levels; the
+  regressor is the change in the quarterly average level (matching how GDP is
+  measured), not the average of monthly growth rates. A controlled test
+  (`test_regressor_recovers_truth_better_than_averaging_growth_rates`) shows this
+  recovers true quarterly growth with ~60% lower error at the one-month edge.
+- **Rolling estimation.** Bridge intercepts are estimated on a 40-quarter window,
+  because Australian trend growth has declined and an expanding window anchors on
+  a stale average — the same reason a rolling mean beats an expanding one here.
+- **Vintage timing.** The backtest runs at 0/30/60/80 days after each GDP
+  release; a leak assertion fires if the offset ever reaches the target quarter's
+  own publication.
 
-2. **Final-vintage data, not real-time vintages.** Values used are the latest
-   revised estimates, not the first prints a forecaster would have seen.
-   Revisions to Australian GDP can be several tenths of a percentage point.
-   This likely flatters measured performance. `readabs` supports
-   `read_abs_cat(cat, history="dec-2023")` for true vintage data — a planned
-   extension.
+## Limitations
 
-3. **COVID.** June-quarter 2020 is roughly a ten-sigma observation. Results
-   will be reported for the full sample, pre-2020, and post-2021 separately.
-
-4. **Small sample.** ~265 quarterly observations since 1959. Flexible models
-   are expected to struggle relative to simple benchmarks; that comparison is
-   a result, not a failure.
-
-## Planned
-
-- [x] Confirm series IDs and verify every publication lag
-- [x] Point-in-time panel with ragged-edge handling
-- [x] Stationarity transforms and ADF tests
-- [x] Benchmarks: historical mean, random walk, AR(1), AR(p)
-- [x] Expanding-window backtest at each GDP release date
-- [x] Diebold-Mariano tests
-- [x] Bridge equations (partial-quarter consistent, levels-then-growth)
-- [x] Ridge on all indicators
-- [x] Rolling-window estimation (drifting trend growth)
-- [x] RMSE by days-into-quarter
-- [x] Dynamic factor model (`statsmodels.tsa.statespace.dynamic_factor_mq`)
-- [ ] Ridge / gradient boosting comparison
-- [ ] RMSE by days-into-quarter against AR(1)
+1. **Final-vintage data**, not real-time vintages — measured accuracy is
+   optimistic versus a true real-time system. `readabs` supports historical
+   vintages (`history=`) as a future extension.
+2. **Constant publication lags** across the sample, though ABS releases were
+   slower historically.
+3. **Short sample** (~130 quarters post-1983), which limits flexible models.
+4. **COVID:** 2020Q2 is a ~10σ observation; results are reported full-sample,
+   pre-COVID, and 1993–2019 separately.
 
 ## Data sources
 
-Australian Bureau of Statistics and Reserve Bank of Australia, retrieved via
+Australian Bureau of Statistics and Reserve Bank of Australia, via
 [`readabs`](https://pypi.org/project/readabs/). All data is publicly available.
+This is a personal research project and not investment advice.

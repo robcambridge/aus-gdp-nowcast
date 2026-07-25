@@ -109,3 +109,44 @@ def test_make_dfm_names_itself():
 def test_dfm_two_factors_runs():
     ctx, _, names = _factor_context(n_ind=6)
     assert np.isfinite(dfm_forecast(ctx, names, factors=2, maxiter=60))
+
+
+# --- news decomposition ----------------------------------------------------
+
+
+def test_news_decomposition_attributes_impact():
+    """Sum of per-release impacts equals the total nowcast revision."""
+    from ausgdp.factor import news_decomposition
+
+    rng = np.random.default_rng(1)
+    m_idx = pd.period_range("2000-01", periods=180, freq="M")
+    q_idx = pd.period_range("2000Q1", periods=58, freq="Q")
+    f = np.cumsum(rng.normal(0, 0.4, 180))
+    monthly = pd.DataFrame(
+        {f"ind{i}": f * rng.uniform(0.5, 1.5) + rng.normal(0, 0.6, 180) for i in range(3)},
+        index=m_idx,
+    )
+    q = pd.DataFrame({"gdp_growth": f[2::3][:58] * 0.3 + rng.normal(0, 0.3, 58)}, index=q_idx)
+
+    details = news_decomposition(
+        monthly.iloc[:176], monthly.iloc[:178], q, pd.Period("2014Q4", freq="Q")
+    )
+    assert details is not None
+    assert {"news", "weight", "impact"} <= set(details.columns)
+    # impact should equal news * weight, row by row
+    np.testing.assert_allclose(
+        details["impact"].to_numpy(),
+        (details["news"] * details["weight"]).to_numpy(),
+        atol=1e-6,
+    )
+
+
+def test_news_decomposition_falls_back_to_none():
+    from ausgdp.factor import news_decomposition
+
+    q = pd.DataFrame(
+        {"gdp_growth": [0.5, 0.6]}, index=pd.period_range("2014Q1", periods=2, freq="Q")
+    )
+    assert news_decomposition(
+        pd.DataFrame(), pd.DataFrame(), q, pd.Period("2014Q2", freq="Q")
+    ) is None

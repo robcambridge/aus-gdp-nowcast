@@ -1,0 +1,31 @@
+{
+  "as_of": "2026-07-25",
+  "generated": "2026-07-25",
+  "target_quarter": "2026Q2",
+  "latest_published_quarter": "2026Q1",
+  "latest_published_value": 0.274,
+  "headline_model": "bridge_average",
+  "headline_nowcast": 0.385,
+  "forecasts": {
+    "mean": 0.819,
+    "rolling_mean": 0.551,
+    "random_walk": 0.274,
+    "ar1": 0.854,
+    "ar_aic": 0.808,
+    "bridge_average": 0.385,
+    "bridge_building_approvals": 0.581,
+    "bridge_employment": 0.092,
+    "bridge_goods_exports": 0.565,
+    "bridge_hours_worked": 0.709,
+    "bridge_unemployment_rate": -0.021,
+    "ridge": 0.603,
+    "dfm_1f": null
+  },
+  "indicators": [
+    "building_approvals",
+    "employment",
+    "goods_exports",
+    "hours_worked",
+    "unemployment_rate"
+  ]
+}

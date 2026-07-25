@@ -39,10 +39,17 @@ import pandas as pd
 
 from .benchmarks import Context, f_mean
 
+# statsmodels' state-space code emits a ValueWarning about non-monotonic
+# PeriodIndex on every forecast call. It is harmless here -- our index is
+# monotonic; statsmodels just cannot tell for a PeriodIndex -- and at hundreds
+# of vintages it drowns the console. Silence this one specific warning.
+_SS_WARN = "A date index has been provided"
+
 
 def _fit_quietly(model, maxiter: int):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
+        warnings.filterwarnings("ignore", message=_SS_WARN)
         return model.fit(disp=False, maxiter=maxiter)
 
 
@@ -169,3 +176,75 @@ def make_dfm(
         f"on {monthly_series} + {target}."
     )
     return forecaster
+
+
+def news_decomposition(
+    monthly_old: pd.DataFrame,
+    monthly_new: pd.DataFrame,
+    quarterly: pd.DataFrame,
+    impact_quarter: pd.Period,
+    target: str = "gdp_growth",
+    factors: int = 1,
+    factor_orders: int = 2,
+    maxiter: int = 100,
+) -> pd.DataFrame | None:
+    """Attribute a change in the nowcast to the data releases that caused it.
+
+    This is what a nowcasting desk actually produces. Between two vintages new
+    monthly numbers arrive; each differs from what the model expected; that
+    surprise ("news") moves the nowcast by an amount equal to the surprise times
+    the weight the Kalman filter places on that series. This function returns
+    one row per (release month, indicator) with:
+
+        news    the surprise: observed value minus the model's prior forecast
+        weight  how much the filter lets that series move the nowcast
+        impact  news * weight -- the contribution to the change in the nowcast
+
+    Sum of `impact` = total revision to the nowcast between the two vintages.
+
+    Parameters
+    ----------
+    monthly_old : monthly panel at the earlier vintage (fewer observations)
+    monthly_new : monthly panel at the later vintage (more observations)
+    quarterly   : the quarterly target, identical for both (only monthly data
+                  arrived between the vintages)
+    impact_quarter : the quarter whose nowcast we are decomposing
+
+    Returns None on any estimation failure.
+    """
+    try:
+        from statsmodels.tsa.statespace.dynamic_factor_mq import DynamicFactorMQ
+    except ImportError:
+        return None
+
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            res_old = DynamicFactorMQ(
+                monthly_old, endog_quarterly=quarterly, factors=factors,
+                factor_orders=factor_orders, idiosyncratic_ar1=False,
+            ).fit(disp=False, maxiter=maxiter)
+            res_new = DynamicFactorMQ(
+                monthly_new, endog_quarterly=quarterly, factors=factors,
+                factor_orders=factor_orders, idiosyncratic_ar1=False,
+            ).fit(disp=False, maxiter=maxiter)
+            news = res_new.news(
+                res_old, impact_date=impact_quarter, impacted_variable=target
+            )
+    except Exception:  # noqa: BLE001
+        return None
+
+    details = news.details_by_update.copy()
+    details = details.reset_index()
+
+    # Flatten to the columns a reader cares about.
+    keep = {}
+    for col in details.columns:
+        name = col if isinstance(col, str) else col[-1] if isinstance(col, tuple) else str(col)
+        keep[col] = name
+    details = details.rename(columns=keep)
+
+    out_cols = [c for c in ["update date", "updated variable", "observed",
+                            "forecast (prev)", "news", "weight", "impact"]
+                if c in details.columns]
+    return details[out_cols].reset_index(drop=True)
