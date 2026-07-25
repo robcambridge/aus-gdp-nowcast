@@ -30,6 +30,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from ausgdp.benchmarks import BENCHMARKS, diebold_mariano, run_backtest  # noqa: E402
 from ausgdp.bridge import make_bridge, make_bridge_average, make_ridge  # noqa: E402
 from ausgdp.config import SHORT_HISTORY  # noqa: E402
+from ausgdp.factor import make_dfm  # noqa: E402
 
 PROCESSED = Path("data/processed")
 FIGURES = Path("outputs/figures")
@@ -55,14 +56,19 @@ OFFSETS = [0, 30, 60, 80]
 # a period of higher trend growth and biases forecasts upward.
 WINDOW = 40
 
+# The DFM is ~100x slower than a bridge. Forecast every DFM_STRIDE-th quarter so
+# a full pass stays a few minutes rather than tens of minutes. Set to 1 for the
+# final, definitive run if you are willing to wait ~7 minutes.
+DFM_STRIDE = 2
 
-def build_models(indicators: list[str]) -> dict:
-    """Benchmarks, plus bridges estimated on a rolling window without an AR term.
 
-    The AR term is dropped because ar1 was not significantly better than the
-    mean on this data (p = 0.30): a coefficient that is really zero still costs
-    estimation variance. `bridge_average_expanding` keeps the original
-    specification so the effect of both choices stays visible.
+def build_fast_models(indicators: list[str]) -> dict:
+    """Benchmarks and bridges: cheap enough to run at every vintage offset.
+
+    The AR term is dropped from the tuned bridges because ar1 was not
+    significantly better than the mean on this data (p = 0.30): a coefficient
+    that is really zero still costs estimation variance. `bridge_avg_expanding`
+    keeps the original specification so the effect stays visible.
     """
     models = dict(BENCHMARKS)
     for name in indicators:
@@ -75,6 +81,19 @@ def build_models(indicators: list[str]) -> dict:
     return models
 
 
+def build_slow_models(indicators: list[str], all_monthly: list[str]) -> dict:
+    """Dynamic factor models: re-estimated by EM at every vintage, so slow.
+
+    Run at a single offset only. One uses the balanced indicator set; the other
+    adds the short-history series (household spending) that the bridges dropped,
+    since the DFM handles a ragged LEFT edge natively.
+    """
+    return {
+        "dfm_1f": make_dfm(indicators, factors=1),
+        "dfm_1f_all": make_dfm(all_monthly, factors=1),
+    }
+
+
 def main() -> None:
     path = PROCESSED / "panel.csv"
     if not path.exists():
@@ -82,22 +101,24 @@ def main() -> None:
 
     panel = pd.read_csv(path, parse_dates=["ref_end", "available_from"])
 
-    monthly_series = sorted(
-        set(panel.loc[panel["freq"] == "M", "series"]) - SHORT_HISTORY
-    )
+    all_monthly = sorted(set(panel.loc[panel["freq"] == "M", "series"]))
+    monthly_series = [s for s in all_monthly if s not in SHORT_HISTORY]
     if not monthly_series:
         sys.exit("No monthly indicators in the panel. Check 06_build_dataset.py.")
 
     print(f"Panel: {len(panel):,} observations")
-    print(f"Indicators used: {', '.join(monthly_series)}")
-    print(f"Excluded (short history): {', '.join(sorted(SHORT_HISTORY))}\n")
+    print(f"Balanced indicators: {', '.join(monthly_series)}")
+    print(f"DFM-only (short history): {', '.join(sorted(SHORT_HISTORY))}\n")
+    print("Note: the DFM models are slow (~1-3 min each). Please wait.\n")
 
-    models = build_models(monthly_series)
+    fast_models = build_fast_models(monthly_series)
+    slow_models = build_slow_models(monthly_series, all_monthly)
+    richest_offset = max(OFFSETS)
 
     all_scores, all_results = [], {}
 
     for offset in OFFSETS:
-        res = run_backtest(panel, models=models, vintage_offset_days=offset)
+        res = run_backtest(panel, models=fast_models, vintage_offset_days=offset)
         all_results[offset] = res
 
         for start, end, label in [
@@ -123,6 +144,42 @@ def main() -> None:
 
     scores = pd.concat(all_scores, ignore_index=True)
 
+    # --- DFM comparison, on a matched (strided) sample ---------------------
+    # The DFM refits by EM at every vintage and is ~100x slower than a bridge.
+    # We run it every STRIDE-th quarter at the richest offset, and run the fast
+    # models on the SAME strided vintages so the RMSE comparison is fair.
+    print("\n" + "=" * 74)
+    print(f"DYNAMIC FACTOR MODEL   (offset {richest_offset}d, every {DFM_STRIDE} quarters)")
+    print("=" * 74)
+    print("  Fitting -- the DFM re-estimates by EM at each vintage, please wait.\n")
+
+    compare_models = dict(slow_models)
+    compare_models["bridge_average"] = fast_models["bridge_average"]
+    compare_models["rolling_mean"] = fast_models["rolling_mean"]
+
+    dfm_res = run_backtest(
+        panel, models=compare_models,
+        vintage_offset_days=richest_offset, stride=DFM_STRIDE,
+    )
+    dfm_scores = dfm_res.score(start="1993Q1", end="2019Q4", label="1993-2019")
+    if dfm_scores.empty:
+        dfm_scores = dfm_res.score(label="full")
+    print(f"  {len(dfm_res.forecasts)} nowcasts on the strided sample\n")
+    print(dfm_scores.drop(columns="sample").round(4).to_string())
+
+    dfm_err = dfm_res.errors()
+    ref = "bridge_average" if "bridge_average" in dfm_err else "rolling_mean"
+    print(f"\n  Diebold-Mariano vs {ref} (same strided sample):")
+    for name in dfm_err.columns:
+        if name == ref:
+            continue
+        stat, pval = diebold_mariano(dfm_err[name], dfm_err[ref])
+        if pd.notna(stat):
+            verdict = ("better" if stat < 0 and pval < 0.05
+                       else "worse" if stat > 0 and pval < 0.05
+                       else "no sig. difference")
+            print(f"    {name:<14} dm={stat:>6.3f}  p={pval:.4f}  {verdict}")
+
     # --- the headline: does more data help? --------------------------------
     print("=" * 74)
     print("RMSE BY HOW MUCH DATA HAS ARRIVED   (sample 1993-2019)")
@@ -132,8 +189,10 @@ def main() -> None:
     modern = scores.loc[scores["sample"] == "1993-2019"]
     if not modern.empty:
         pivot = modern.pivot(index="model", columns="offset_days", values="rmse")
-        pivot = pivot.sort_values(pivot.columns[-1])
+        pivot = pivot.sort_values(pivot.columns[-1], na_position="last")
         print(pivot.round(4).to_string())
+        print("\n  (DFM rows show a value only at the richest offset; they are")
+        print("   too slow to run at every vintage.)")
 
     # --- best model vs best benchmark --------------------------------------
     res60 = all_results[OFFSETS[-1]]

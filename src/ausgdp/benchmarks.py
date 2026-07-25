@@ -196,6 +196,7 @@ def run_backtest(
     target: str = "gdp_growth",
     min_history: int = 40,
     vintage_offset_days: int = 0,
+    stride: int = 1,
 ) -> BacktestResult:
     """One nowcast per GDP release, using only what was visible that morning.
 
@@ -206,6 +207,10 @@ def run_backtest(
     min_history at least this many quarters before we start forecasting
     vintage_offset_days
                 days to wait AFTER the GDP release before forecasting.
+    stride      forecast every `stride`-th release instead of all of them.
+                stride=1 uses every quarter; stride=4 forecasts roughly once a
+                year. Only for expensive models (the DFM) where a full pass is
+                slow -- it thins the evaluation sample, so scores are noisier.
 
     On `vintage_offset_days`: standing exactly on the day quarter t's GDP is
     published, quarter t+1 is only about two-thirds over, and with a 26-day
@@ -224,6 +229,8 @@ def run_backtest(
     """
     models = models or BENCHMARKS
     releases = target_release_dates(panel, target)
+    if stride > 1:
+        releases = releases.iloc[::stride]
     offset = pd.Timedelta(days=vintage_offset_days)
 
     # The full (final-vintage) target series, used only to score forecasts.

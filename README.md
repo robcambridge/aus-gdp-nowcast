@@ -3,7 +3,7 @@
 Point-in-time nowcasting of Australian quarterly real GDP growth using monthly
 ABS and RBA indicators.
 
-**Status:** Phase 2. Point-in-time data layer complete; benchmark models running.
+**Status:** Phase 3. Bridges and a dynamic factor model implemented and evaluated.
 
 ---
 
@@ -60,6 +60,7 @@ src/ausgdp/dataset.py      Long panel, Snapshot, as_of(), ragged-edge diagnostic
 src/ausgdp/transforms.py   Panel prep, ADF tests, levels-to-quarterly regressors
 src/ausgdp/benchmarks.py   Benchmarks, Context, backtest, Diebold-Mariano
 src/ausgdp/bridge.py       Bridge equations and ridge on monthly indicators
+src/ausgdp/factor.py       Mixed-frequency dynamic factor model (Kalman/EM)
 
 scripts/01_discover.py     Confirm ABS series IDs            (network)
 scripts/02_demo_*.py       Offline demo of point-in-time logic
@@ -70,7 +71,7 @@ scripts/06_build_dataset.py  Transform + build panel         (offline)
 scripts/07_benchmark.py    Benchmarks only                   (offline)
 scripts/08_horse_race.py   Full comparison at 3 vintages     (offline)
 
-tests/                     59 tests: leakage, ragged edge, transforms, backtest
+tests/                     67 tests: leakage, ragged edge, transforms, backtest
 ```
 
 ## Limitations (read before believing any result)
@@ -109,7 +110,7 @@ tests/                     59 tests: leakage, ragged edge, transforms, backtest
 - [x] Ridge on all indicators
 - [x] Rolling-window estimation (drifting trend growth)
 - [x] RMSE by days-into-quarter
-- [ ] Dynamic factor model (`statsmodels.tsa.statespace.dynamic_factor_mq`)
+- [x] Dynamic factor model (`statsmodels.tsa.statespace.dynamic_factor_mq`)
 - [ ] Ridge / gradient boosting comparison
 - [ ] RMSE by days-into-quarter against AR(1)
 
