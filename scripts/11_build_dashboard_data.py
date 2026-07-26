@@ -24,7 +24,7 @@ import pandas as pd
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 PROCESSED = Path("data/processed")
-DASHBOARD = Path("dashboard")
+DASHBOARD = Path("docs")
 
 
 def _read_json(name: str) -> dict:
