@@ -1,22 +1,4 @@
-"""Step 8: the full horse race.
 
-Benchmarks (which use only GDP's own past) against bridge equations and ridge
-(which use the monthly indicators). Run at three points in the quarter, so you
-can see accuracy improve as data arrives.
-
-This is the core result of the project.
-
-USAGE
------
-    uv run python scripts\\08_horse_race.py
-
-OUTPUT
-------
-    data/processed/horserace_scores.csv
-    data/processed/horserace_by_vintage.csv
-    outputs/figures/rmse_by_vintage.png
-    outputs/figures/horserace_actual_vs_predicted.png
-"""
 
 from __future__ import annotations
 

@@ -2,9 +2,6 @@
 
 THE BENCHMARKS
 --------------
-Before any machine learning, you need to know what "good" is. These three are
-the bar. If a fancy model cannot beat them, the fancy model is not earning its
-complexity -- and reporting that clearly is a legitimate, publishable result.
 
     mean          forecast the historical average growth rate
     random_walk   forecast that next quarter equals this quarter

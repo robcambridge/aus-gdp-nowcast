@@ -1,27 +1,8 @@
 """Point-in-time data handling: the ragged edge.
 
-THE PROBLEM
------------
-On 3 September 2024 the ABS publishes June-quarter GDP. Standing at that
-moment, what did you actually know?
-
-  * June-quarter GDP            -> just published, you know it
-  * September-quarter GDP       -> the quarter is not even over; unknown
-  * July labour force           -> published mid-August, you know it
-  * August labour force         -> not until mid-September, unknown
-  * July retail turnover        -> published early September, you know it
-  * July building approvals     -> published early September, maybe
-
-Different series stop at different points. Lay them out as a table and the
-bottom-right corner is missing in an uneven, staircase pattern. That pattern is
-called the RAGGED EDGE, and handling it correctly is the whole game. Get it
-wrong -- let one August observation leak into a forecast made in early
-September -- and your model looks brilliant for reasons that have nothing to do
-with economics.
-
 THE APPROACH
 ------------
-We never store a plain wide table. We store a LONG table where every single
+ We store a LONG table where every single
 observation carries the date it became public:
 
     series      ref_period  ref_end     value  available_from

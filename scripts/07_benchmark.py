@@ -1,23 +1,3 @@
-"""Step 7: the benchmark horse race. This produces the number to beat.
-
-Runs one nowcast per GDP release, using only data published by that morning,
-and scores four benchmark models against each other.
-
-Read the output carefully. If your later machine-learning models cannot beat
-the best number here, say so plainly in your report -- that is a real finding,
-not a failure. Most published nowcasting work struggles to beat a well-tuned
-AR benchmark by more than 10-25%.
-
-USAGE
------
-    uv run python scripts\\07_benchmark.py
-
-OUTPUT
-------
-    data/processed/benchmark_forecasts.csv
-    data/processed/benchmark_scores.csv
-    outputs/figures/benchmark_actual_vs_predicted.png
-"""
 
 from __future__ import annotations
 

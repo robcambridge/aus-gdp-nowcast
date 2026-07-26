@@ -1,40 +1,5 @@
 """Bridge equations: the first models that use the monthly indicators.
 
-THE IDEA
---------
-GDP is quarterly and late. Employment is monthly and early. A bridge equation
-"bridges" the frequency gap in the simplest possible way:
-
-    1. Average the monthly indicator within each quarter.
-    2. Regress quarterly GDP growth on that quarterly average.
-    3. For the quarter you are nowcasting, plug in the average of whatever
-       months have arrived so far.
-
-Standing on the day June-quarter GDP is published (early September), you may
-already hold July and August employment. The September quarter is not over,
-but you have a partial read on it that GDP itself cannot give you for another
-three months. That is the entire informational edge of this project.
-
-THE SUBTLETY THAT MOST IMPLEMENTATIONS GET WRONG
-------------------------------------------------
-If you estimate the regression on three-month averages but predict from a
-one-month average, you have a mismatch: a one-month average is noisier, so the
-coefficient you estimated is wrong for the input you are feeding it. The model
-will be overconfident.
-
-The fix used here is to make estimation and prediction consistent. If only two
-months of the target quarter have arrived, we rebuild the ENTIRE history using
-two-month averages, then estimate. The regression then sees exactly the kind of
-input it will be asked to predict from.
-
-This means re-estimating whenever the number of available months changes, which
-is why `partial_quarterly_mean` takes `n_months`.
-
-WHY BRIDGES BEFORE ANYTHING FANCIER
------------------------------------
-They are transparent, fast, and surprisingly hard to beat. If a dynamic factor
-model cannot beat a simple average of bridge equations, the factor model is not
-earning its complexity.
 """
 
 from __future__ import annotations

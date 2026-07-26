@@ -1,3 +1,5 @@
+LIVE MODEL DASHBOARD: https://robcambridge.github.io/aus-gdp-nowcast/
+
 # Australian GDP Nowcasting System
 
 A point-in-time nowcasting system for Australian quarterly real GDP growth,
@@ -11,13 +13,12 @@ univariate benchmarks.
 
 ---
 
-## The problem, stated precisely
+## The problem this project addresses
 
 The ABS publishes quarterly GDP about nine weeks after the quarter ends — the
 June quarter lands in early September. So when GDP for quarter *t* is released,
 quarter *t+1* is already over but unmeasured. This system nowcasts *t+1* using
-only data published on or before a given date — the way the RBA and Treasury
-actually operate.
+only data published on or before a given date.
 
 ## Why point-in-time is the whole game
 
@@ -41,10 +42,9 @@ On an out-of-sample backtest (1993–2019, one nowcast per GDP release):
 - A **mixed-frequency dynamic factor model** does not beat the simpler
   combination, and adding a short-history spending series does not help.
 
-The honest conclusion: standard monthly indicators offer limited, non-significant
+The conclusion: standard monthly indicators offer limited, non-significant
 uplift for Australian GDP at a one-quarter horizon, and flexible models do not
-outperform simple ones on a ~130-quarter sample. The framework is built so that
-this is a credible finding rather than a disappointing one.
+outperform simple ones on a ~130-quarter sample.
 
 ## Quickstart
 
@@ -111,7 +111,7 @@ report/           generated research report (.docx) + figures
 tests/            69 tests: leakage, ragged edge, transforms, models, news
 ```
 
-## Method notes worth reading
+## Method notes
 
 - **Bridge construction.** Monthly indicators enter the panel as levels; the
   regressor is the change in the quarterly average level (matching how GDP is

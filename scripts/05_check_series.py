@@ -1,34 +1,3 @@
-"""Verify that every series you pinned is actually the series you meant.
-
-WHY THIS EXISTS
----------------
-A Series ID is an opaque code like "A422070J". Nothing about it tells you
-whether you grabbed national dwelling approvals or Tasmanian ones. A wrong pin
-does not raise an error -- it silently gives you the wrong economy, and every
-number downstream is quietly meaningless.
-
-So: fetch each pinned series and eyeball it against what you expect. Numbers
-have magnitudes. National employment is ~14,000 (thousands of people).
-Employment in Tasmania is ~270. If the magnitude is wrong, the pin is wrong.
-
-USAGE
------
-    uv run python scripts\\05_check_series.py
-
-WHAT TO LOOK FOR
-----------------
-1. START DATE  -- does the history go back as far as you expect?
-2. END DATE    -- is it recent? A stale end date means a discontinued series.
-3. MAGNITUDE   -- does the mean look like a national figure or a state one?
-4. UNIT        -- percent, $ millions, 000, Number. Must match the transform.
-
-Expected national magnitudes (rough, for sanity only):
-    employment           ~14,000  (unit: 000 persons)
-    unemployment_rate    ~4 to 6  (unit: Percent)
-    hours_worked         ~1,900,000  (unit: 000 Hours)
-    building_approvals   ~13,000 to 20,000 per month (unit: Number)
-    gdp_growth           ~600,000 (unit: $ Millions, LEVEL not growth yet)
-"""
 
 from __future__ import annotations
 

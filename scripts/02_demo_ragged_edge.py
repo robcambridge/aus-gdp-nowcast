@@ -1,12 +1,4 @@
-"""Step 2: see the ragged edge with your own eyes.
-
-This runs on SYNTHETIC data and needs no network, so you can run it right now
-before any ABS download works. Its only purpose is to make the point-in-time
-machinery concrete: what did I know, on what date?
-
-Run it, read the output, and make sure you can explain every line of the tables
-it prints. Once the real data lands, the same functions do the same job.
-
+"""
 Usage
 -----
     uv run python scripts/02_demo_ragged_edge.py
@@ -126,7 +118,7 @@ def main() -> None:
     print("  bottom edge of the data is a staircase, not a straight line.")
     print("  Read across each row: by 20 Nov you hold all three months of the")
     print("  September quarter for the fast series -- but ABS will not publish")
-    print("  2024Q3 GDP until 2024-12-04. That gap is the whole opportunity.")
+    print("  2024Q3 GDP until 2024-12-04.")
 
 
 def ref_just_published_next(ref: str) -> str:

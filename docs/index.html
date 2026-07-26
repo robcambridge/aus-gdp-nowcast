@@ -214,7 +214,7 @@ async function main(){
        <span><i style="background:var(--accent);border-top:1px dashed"></i>rolling-mean benchmark</span>`;
     card.appendChild(lg);
     card.appendChild(el("div","caption",
-      "Lower is better. The headline model falls as more monthly data arrives — "+
+      "Lower is better. The headline model falls as more monthly data arrives: "+
       "the signature of a working nowcast. Flat lines are models that ignore the "+
       "monthly indicators."));
     app.append(card);
@@ -229,7 +229,7 @@ async function main(){
     card.appendChild(el("div","caption",
       "RMSE and MAE in percentage points of quarterly growth. Improvement is versus "+
       "the rolling-mean benchmark. The gap is small and not statistically significant "+
-      "(Diebold–Mariano p≈0.17) — an honest result: standard indicators offer limited "+
+      "(Diebold–Mariano p≈0.17). Result: standard indicators offer limited "+
       "uplift for Australian GDP at one quarter, and the flexible models do not win."));
     app.append(card);
   }
@@ -256,8 +256,7 @@ async function main(){
     card.appendChild(newsBlock(data.news));
     card.appendChild(el("div","caption",
       "Each monthly release surprised the model by <b>news</b> (observed minus expected); "+
-      "the Kalman filter weighted it, moving the nowcast by <b>impact</b>. This is what "+
-      "a central-bank nowcasting desk publishes — the model as an explanation, not a black box."));
+      "the Kalman filter weighted it, moving the nowcast by <b>impact</b>."));
     app.append(card);
   }
 

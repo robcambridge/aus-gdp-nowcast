@@ -1,33 +1,5 @@
 """Dynamic factor model: pool all indicators through one latent factor.
 
-WHY A FACTOR MODEL, AFTER BRIDGES
----------------------------------
-A bridge equation reads each indicator in isolation. But employment, hours,
-approvals and exports are all noisy reflections of one underlying thing -- the
-state of the business cycle. A dynamic factor model says exactly that: a small
-number of unobserved factors drive every series, and each observed series is
-the factor plus idiosyncratic noise. Estimating the common factor averages
-away noise that no single indicator can escape.
-
-The MQ ("mixed-frequency") variant is the reason this is worth the complexity:
-
-  * it takes monthly and quarterly series together, at their native
-    frequencies, with no pre-aggregation;
-  * it handles the ragged edge natively via the Kalman filter -- a series that
-    stops early simply contributes no observation for its missing months, and
-    the filter fills the gap from the factor;
-  * it handles the short left edge too, so household spending (from 2012) can
-    join the panel and contribute only where it exists.
-
-This is the architecture behind the New York Fed Staff Nowcast.
-
-WHAT TO EXPECT
---------------
-On this data, do not expect the DFM to crush the bridge combination on RMSE.
-The value is twofold: a single principled model that uses every series at once
-including the short one, and the `news` decomposition -- attributing a change
-in the nowcast to the specific data release that caused it, which is what a
-research analyst actually does.
 """
 
 from __future__ import annotations

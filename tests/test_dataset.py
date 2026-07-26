@@ -1,7 +1,4 @@
 """Tests for the point-in-time logic.
-
-These are not decorative. The leakage test below is the one thing standing
-between you and a backtest that quietly reports a fake 60% improvement.
 """
 
 import pandas as pd

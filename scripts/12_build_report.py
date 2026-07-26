@@ -1,14 +1,4 @@
-"""Step 12: generate the research report as a Word document.
-
-Reads the results your pipeline produced (data/processed/*.csv and
-live_nowcast.json) and writes a 5-10 page .docx with your ACTUAL numbers,
-tables, and figures. Regenerating after a fresh data run updates every figure.
-
-This is a Node/docx-js job wrapped by Python: we first assemble a JSON payload
-of the numbers and figures from your data, then hand it to a Node script that
-builds the .docx (docx-js is the reliable way to create Word files here).
-
-USAGE
+"""
 -----
     uv run python scripts\\12_build_report.py
 

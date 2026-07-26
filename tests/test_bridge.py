@@ -1,6 +1,6 @@
 """Tests for bridge equations and the levels-then-growth regressor they use.
 
-Two properties matter here.
+Two important properties:
 
 CONSISTENCY: when only n months of the target quarter are available, the whole
 history must be rebuilt using n-month averages. Estimating on three-month

@@ -1,34 +1,4 @@
-"""Search the ABS metadata you already downloaded.
-
-scripts/01_discover.py saves the full metadata for each collection to
-data/raw/meta_<cat>.csv. This script searches those files offline -- no
-internet needed, instant results.
-
-Use it whenever a search in config.py comes back with NO MATCHES or with too
-many matches. ABS descriptions are wordy and use an odd " ; " separator, so
-guessing the exact phrasing rarely works. Searching for one plain word does.
-
-USAGE
------
-List which metadata files you have:
-    uv run python scripts\\03_search_meta.py
-
-Summarise one collection:
-    uv run python scripts\\03_search_meta.py 5368.0
-
-Search descriptions for a word:
-    uv run python scripts\\03_search_meta.py 5368.0 exports
-
-Search for several words (all must appear):
-    uv run python scripts\\03_search_meta.py 5368.0 goods credits
-
-Narrow to seasonally adjusted monthly series only:
-    uv run python scripts\\03_search_meta.py 5368.0 goods --sa --monthly
-
-WHAT TO DO WITH THE RESULT
---------------------------
-Find the row you want, copy its Series ID, and paste it into the matching
-SeriesSpec in src/ausgdp/config.py as  series_id="A2718015W".
+"""
 """
 
 from __future__ import annotations

@@ -1,8 +1,5 @@
 """Tests for the dynamic factor model wrapper.
 
-The DFM is slow to fit, so these use small samples and capped iterations. They
-check that it (a) recovers a genuine common factor, (b) handles the ragged edge,
-and (c) falls back to the mean rather than crashing on any degenerate input.
 """
 
 import warnings

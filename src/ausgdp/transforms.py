@@ -1,17 +1,5 @@
 """Turn raw levels into stationary series, and assemble the point-in-time panel.
 
-WHY TRANSFORM AT ALL
---------------------
-Employment is about 14,800 thousand and rising almost every month. A model fed
-that series learns "next month is a bit bigger than this month" and nothing
-else. Worse, standard inference assumes the data is STATIONARY -- roughly, that
-its mean and variance do not drift over time. Levels of macro series are not.
-Growth rates usually are.
-
-So: employment level -> employment growth (% change on previous month).
-Unemployment RATE is already scaled, so we difference it instead of taking a
-percent change (a move from 4.0% to 4.4% is +0.4 points, not +10%).
-
 WHEN TO TRANSFORM: BEFORE BUILDING THE PANEL
 --------------------------------------------
 A percent change for month t uses months t and t-1. Both were published by the

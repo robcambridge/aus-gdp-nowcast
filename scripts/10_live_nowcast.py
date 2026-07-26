@@ -1,22 +1,4 @@
-"""Step 10: the live nowcast. What is GDP growth doing right now?
 
-Everything up to here evaluated the models on history. This produces the actual
-current forecast: standing today, with the data published so far, what is the
-model's nowcast for the quarter that has not yet been released?
-
-This is the headline number for the dashboard and the README. Unlike the
-backtest, there is no "actual" to compare against yet -- that is the point. When
-the ABS publishes the quarter (in a few weeks), you find out whether you were
-right, which is the honest test of any forecasting system.
-
-USAGE
------
-    uv run python scripts\\10_live_nowcast.py
-
-OUTPUT
-------
-    data/processed/live_nowcast.json
-"""
 
 from __future__ import annotations
 

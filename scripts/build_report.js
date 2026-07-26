@@ -180,7 +180,7 @@ kids.push(p(
   `emphasis is not on a single model but on an honest evaluation framework: the ` +
   `central question is whether monthly indicators genuinely improve on naive ` +
   `benchmarks once look-ahead bias is eliminated. The distinction matters because ` +
-  `nowcasting results are unusually easy to inflate — a one-line timing error that ` +
+  `nowcasting results are unusually easy to inflate; a one-line timing error that ` +
   `lets a model see data from the future can produce large but entirely spurious ` +
   `accuracy gains.`));
 
@@ -191,7 +191,7 @@ kids.push(p(
   `seasonally adjusted; ABS 5206.0). Predictors are drawn from monthly ABS and RBA ` +
   `series. All data is publicly available and retrieved programmatically via the ` +
   `readabs package. Table 1 lists the series, their native frequency, the ` +
-  `stationarity transform applied, and — critically — the publication lag used to ` +
+  `stationarity transform applied, and, critically, the publication lag used to ` +
   `determine when each observation became known.`));
 
 const seriesRows = (payload.series || []).map((s) => [
@@ -208,7 +208,7 @@ kids.push(p(
   `Publication lags were verified against the ABS release calendar and set to ` +
   `conservative upper bounds: where a release date varied month to month, the ` +
   `longest recent delay plus a small buffer was used. This biases the system against ` +
-  `itself — it occasionally discards data it could legitimately have used — so ` +
+  `itself, it occasionally discards data it could legitimately have used, so ` +
   `measured accuracy is a lower bound on what a real-time forecaster could achieve. ` +
   `The balanced-panel sample begins ${payload.balanced_start}, constrained by the ` +
   `shortest long-history series; the Monthly Household Spending Indicator ` +
@@ -223,7 +223,7 @@ kids.push(p(
   `equal to the end of its reference period plus its publication lag. A "snapshot" ` +
   `as of any date is formed by keeping only rows whose availability date precedes it. ` +
   `Because series publish at different speeds, the most recent months form a ` +
-  `staircase pattern — the ragged edge — in which faster indicators (labour force) ` +
+  `staircase pattern, the ragged edge, in which faster indicators (labour force) ` +
   `extend further than slower ones (trade, construction). This construction makes ` +
   `look-ahead bias structurally impossible rather than a matter of discipline, and ` +
   `is enforced by an assertion in the backtest and by unit tests that deliberately ` +
@@ -263,7 +263,7 @@ kids.push(h("3.4 Dynamic factor model", HeadingLevel.HEADING_3));
 kids.push(p(
   `The bridge equations read each indicator in isolation. A mixed-frequency dynamic ` +
   `factor model instead treats all indicators as noisy signals of a common latent ` +
-  `factor — the business cycle — estimated by the Kalman filter and EM algorithm ` +
+  `factor: the business cycle, estimated by the Kalman filter and EM algorithm ` +
   `(statsmodels DynamicFactorMQ). It ingests monthly and quarterly series at their ` +
   `native frequencies, handles the ragged edge natively, and can incorporate the ` +
   `short-history spending series. This is the architecture underlying the New York ` +
@@ -313,7 +313,7 @@ kids.push(p([
 kids.push(h("4.2 Accuracy improves as data arrives", HeadingLevel.HEADING_3));
 kids.push(p(
   `Figure 1 plots RMSE against how many days into the forecasting cycle the nowcast ` +
-  `is formed. The headline model's error falls as more monthly data accrues — the ` +
+  `is formed. The headline model's error falls as more monthly data accrues, the ` +
   `signature of a nowcast that is extracting genuine signal, not merely fitting the ` +
   `unconditional mean. Models that ignore the monthly indicators appear as flat lines.`,
   { after: 160 }));
@@ -324,7 +324,7 @@ kids.push(h("4.3 Nowcast versus outcome", HeadingLevel.HEADING_3));
 kids.push(p(
   `Figure 2 overlays the headline nowcast on realised GDP growth across the full ` +
   `evaluation period. The model tracks the broad path of activity but, as the ` +
-  `statistics indicate, adds only modest information beyond a slowly-moving mean — ` +
+  `statistics indicate, adds only modest information beyond a slowly-moving mean, ` +
   `and no model anticipates the COVID collapse of 2020Q2, an approximately ten-sigma ` +
   `event that no indicator-based system could have foreseen.`));
 kids.push(img(payload.figures?.actual_vs_pred, 520, 272));
@@ -337,7 +337,7 @@ if (payload.figures?.news) {
     `nowcast to the specific data releases that caused it. As each indicator is ` +
     `published, its surprise relative to the model's expectation moves the nowcast by ` +
     `an amount equal to that surprise times the weight the Kalman filter assigns it. ` +
-    `Figure 3 shows this decomposition for the current quarter — the model rendered ` +
+    `Figure 3 shows this decomposition for the current quarter. The model rendered ` +
     `as an explanation rather than a black box, which is precisely what a central-bank ` +
     `nowcasting desk publishes.`));
   kids.push(img(payload.figures.news, 520, 256));
@@ -350,12 +350,12 @@ if (live.headline_nowcast != null) {
   kids.push(p([
     new TextRun({ text: `As of ${live.as_of}, the system's nowcast for ${live.target_quarter} — `,
       size: 21, font: "Calibri", color: INK }),
-    new TextRun({ text: `a quarter not yet published by the ABS — is ${fmt(live.headline_nowcast)}% `,
+    new TextRun({ text: `a quarter not yet published by the ABS is ${fmt(live.headline_nowcast)}% `,
       size: 21, font: "Calibri", color: INK, bold: true }),
     new TextRun({ text: `quarter-on-quarter, from the rolling-window bridge combination. The most recently ` +
       `published figure was ${fmt(live.latest_published_value)}% for ${live.latest_published_quarter}. ` +
       `Because the target quarter has no official outcome yet, this is a genuine forward ` +
-      `statement whose accuracy will be revealed at the next ABS release — the honest test of any nowcasting system.`,
+      `statement whose accuracy will be revealed at the next ABS release; the test of any nowcasting system.`,
       size: 21, font: "Calibri", color: INK }),
   ], { after: 160 }));
 }
@@ -389,8 +389,8 @@ kids.push(p(
   `factor model does not beat a simple combination of bridge equations. Far from a ` +
   `disappointment, this is the credible outcome the framework was built to detect: ` +
   `the value of the project lies in the honesty of the evaluation, not in an inflated ` +
-  `accuracy figure. The most promising directions — real-time data vintages and a ` +
-  `broader indicator set including survey and financial data — follow directly from ` +
+  `accuracy figure. The most promising directions is real-time data vintages and a ` +
+  `broader indicator set including survey and financial data which follows directly from ` +
   `the limitations above.`, { after: 160 }));
 
 kids.push(new Paragraph({

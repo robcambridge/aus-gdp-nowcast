@@ -1,24 +1,3 @@
-"""Step 9: news decomposition -- why did the nowcast change?
-
-This is what a nowcasting desk produces. As new monthly data arrives through a
-quarter, each release differs from what the model expected, and that surprise
-moves the nowcast. This script fits the dynamic factor model at two consecutive
-vintages and attributes the change in the current-quarter nowcast to the
-specific data releases responsible.
-
-The DFM did not win the horse race, but the news decomposition is the single
-most report-worthy thing it produces: it turns the model from a black box into
-an explanation a person can read.
-
-USAGE
------
-    uv run python scripts\\09_news.py
-
-OUTPUT
-------
-    data/processed/news_decomposition.csv
-    outputs/figures/news_waterfall.png
-"""
 
 from __future__ import annotations
 

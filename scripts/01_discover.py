@@ -1,13 +1,4 @@
-"""Step 1: find out what actually exists on the ABS website today.
-
-RUN THIS FIRST, before you write any modelling code.
-
-You cannot trust a hardcoded ABS Series ID -- including any I gave you in
-config.py. Collections get restructured, series get discontinued, and a
-mistyped ID silently returns the wrong economy. This script downloads the
-metadata for each collection and shows you the candidate series so you can
-confirm them with your own eyes.
-
+"""
 Usage
 -----
     uv run python scripts/01_discover.py                 # all collections
@@ -18,10 +9,6 @@ Output
 Prints candidate matches, and writes the full metadata for each collection to
 data/raw/meta_<cat>.csv so you can search it in a spreadsheet.
 
-What to do with the output
---------------------------
-For each series you want, copy its Series ID into the matching SeriesSpec in
-src/ausgdp/config.py, e.g.  series_id="A84423043C".
 """
 
 from __future__ import annotations

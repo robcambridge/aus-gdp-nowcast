@@ -1,15 +1,4 @@
-"""Find which ABS collection actually holds the data you want.
-
-WHY THIS EXISTS
----------------
-ABS catalogue numbers are not permanent. Collections get renamed, merged,
-replaced or discontinued. Retail Trade (8501.0) is a live example: it no longer
-exists in the ABS Time Series Directory, so any code that hardcodes "8501.0"
-simply fails.
-
-Rather than guessing a replacement catalogue number, this script downloads the
-ABS's own directory of collections and lets you search it by keyword. Whatever
-it prints is what exists today.
+"""
 
 USAGE
 -----

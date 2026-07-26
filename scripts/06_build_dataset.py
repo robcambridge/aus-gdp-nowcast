@@ -1,20 +1,4 @@
-"""Step 6: build the transformed, point-in-time panel.
 
-Reads the raw levels saved by scripts/05_check_series.py, transforms them to
-stationary growth rates, attaches publication dates, and writes the panel to
-data/processed/panel.csv.
-
-Runs entirely OFFLINE from data/raw -- no ABS download.
-
-USAGE
------
-    uv run python scripts\\06_build_dataset.py
-
-OUTPUT
-------
-    data/processed/panel.csv        the point-in-time panel
-    data/processed/adf_tests.csv    stationarity results (report material)
-"""
 
 from __future__ import annotations
 
