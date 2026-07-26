@@ -1,0 +1,238 @@
+{
+  "live": {
+    "as_of": "2026-07-25",
+    "generated": "2026-07-25",
+    "target_quarter": "2026Q2",
+    "latest_published_quarter": "2026Q1",
+    "latest_published_value": 0.274,
+    "headline_model": "bridge_average",
+    "headline_nowcast": 0.385,
+    "forecasts": {
+      "mean": 0.819,
+      "rolling_mean": 0.551,
+      "random_walk": 0.274,
+      "ar1": 0.854,
+      "ar_aic": 0.808,
+      "bridge_average": 0.385,
+      "bridge_building_approvals": 0.581,
+      "bridge_employment": 0.092,
+      "bridge_goods_exports": 0.565,
+      "bridge_hours_worked": 0.709,
+      "bridge_unemployment_rate": -0.021,
+      "ridge": 0.603,
+      "dfm_1f": null
+    },
+    "indicators": [
+      "building_approvals",
+      "employment",
+      "goods_exports",
+      "hours_worked",
+      "unemployment_rate"
+    ]
+  },
+  "leaderboard": [
+    {
+      "model": "bridge_average",
+      "rmse": 0.5233,
+      "mae": 0.3957,
+      "bias": 0.0259,
+      "improvement": 2.5
+    },
+    {
+      "model": "bridge_employment",
+      "rmse": 0.5358,
+      "mae": 0.3985,
+      "bias": 0.0237,
+      "improvement": 0.2
+    },
+    {
+      "model": "rolling_mean",
+      "rmse": 0.5369,
+      "mae": 0.4009,
+      "bias": 0.0195,
+      "improvement": 0.0
+    },
+    {
+      "model": "bridge_hours_worked",
+      "rmse": 0.5373,
+      "mae": 0.4073,
+      "bias": 0.0266,
+      "improvement": -0.1
+    },
+    {
+      "model": "bridge_avg_expanding",
+      "rmse": 0.5392,
+      "mae": 0.4129,
+      "bias": 0.037,
+      "improvement": -0.4
+    },
+    {
+      "model": "bridge_unemployment_rate",
+      "rmse": 0.5394,
+      "mae": 0.4142,
+      "bias": 0.0511,
+      "improvement": -0.5
+    },
+    {
+      "model": "bridge_building_approvals",
+      "rmse": 0.5403,
+      "mae": 0.4069,
+      "bias": 0.0154,
+      "improvement": -0.6
+    },
+    {
+      "model": "ar1",
+      "rmse": 0.5449,
+      "mae": 0.4184,
+      "bias": 0.1138,
+      "improvement": -1.5
+    },
+    {
+      "model": "mean",
+      "rmse": 0.5457,
+      "mae": 0.4213,
+      "bias": 0.1077,
+      "improvement": -1.6
+    },
+    {
+      "model": "bridge_goods_exports",
+      "rmse": 0.5518,
+      "mae": 0.4215,
+      "bias": 0.0126,
+      "improvement": -2.8
+    },
+    {
+      "model": "ar_aic",
+      "rmse": 0.557,
+      "mae": 0.4382,
+      "bias": 0.1076,
+      "improvement": -3.7
+    },
+    {
+      "model": "ridge",
+      "rmse": 0.5669,
+      "mae": 0.4397,
+      "bias": 0.0283,
+      "improvement": -5.6
+    },
+    {
+      "model": "random_walk",
+      "rmse": 0.8016,
+      "mae": 0.5915,
+      "bias": 0.0139,
+      "improvement": -49.3
+    }
+  ],
+  "adf": [
+    {
+      "series": "building_approvals",
+      "adf_stat": -9.71,
+      "p_value": 0.0,
+      "stationary": true
+    },
+    {
+      "series": "employment",
+      "adf_stat": -11.06,
+      "p_value": 0.0,
+      "stationary": true
+    },
+    {
+      "series": "gdp_growth",
+      "adf_stat": -17.3,
+      "p_value": 0.0,
+      "stationary": true
+    },
+    {
+      "series": "goods_exports",
+      "adf_stat": -6.67,
+      "p_value": 0.0,
+      "stationary": true
+    },
+    {
+      "series": "hours_worked",
+      "adf_stat": -13.28,
+      "p_value": 0.0,
+      "stationary": true
+    },
+    {
+      "series": "household_spending",
+      "adf_stat": -7.8,
+      "p_value": 0.0,
+      "stationary": true
+    },
+    {
+      "series": "unemployment_rate",
+      "adf_stat": -6.2,
+      "p_value": 0.0,
+      "stationary": true
+    }
+  ],
+  "series": [
+    {
+      "name": "gdp_growth",
+      "series_id": "A2304402X",
+      "collection": "5206.0",
+      "freq": "Q",
+      "lag_days": 65,
+      "transform": "pct"
+    },
+    {
+      "name": "employment",
+      "series_id": "A84423043C",
+      "collection": "6202.0",
+      "freq": "M",
+      "lag_days": 26,
+      "transform": "mean_then_pct"
+    },
+    {
+      "name": "unemployment_rate",
+      "series_id": "A84423050A",
+      "collection": "6202.0",
+      "freq": "M",
+      "lag_days": 26,
+      "transform": "mean_then_diff"
+    },
+    {
+      "name": "hours_worked",
+      "series_id": "A84426277X",
+      "collection": "6202.0",
+      "freq": "M",
+      "lag_days": 26,
+      "transform": "mean_then_pct"
+    },
+    {
+      "name": "building_approvals",
+      "series_id": "A422070J",
+      "collection": "8731.0",
+      "freq": "M",
+      "lag_days": 38,
+      "transform": "mean_then_pct"
+    },
+    {
+      "name": "household_spending",
+      "series_id": "A130200584T",
+      "collection": "5682.0",
+      "freq": "M",
+      "lag_days": 40,
+      "transform": "mean_then_pct"
+    },
+    {
+      "name": "goods_exports",
+      "series_id": "A2718577A",
+      "collection": "5368.0",
+      "freq": "M",
+      "lag_days": 40,
+      "transform": "mean_then_pct"
+    }
+  ],
+  "balanced_start": "1983Q3",
+  "short_history": [
+    "household_spending"
+  ],
+  "dm_note": "",
+  "figures": {
+    "vintage_curve": "C:\\projects\\macro-model\\report\\figures\\vintage_curve.png",
+    "actual_vs_pred": "C:\\projects\\macro-model\\report\\figures\\actual_vs_pred.png"
+  },
+  "out_path": "C:\\projects\\macro-model\\report\\Australian_GDP_Nowcasting_Report.docx"
+}

@@ -26,6 +26,7 @@ STEPS = [
     ("09_news.py", "news decomposition", False),
     ("10_live_nowcast.py", "live nowcast", False),
     ("11_build_dashboard_data.py", "assemble dashboard data", False),
+    ("12_build_report.py", "generate the research report (.docx)", False),
 ]
 
 

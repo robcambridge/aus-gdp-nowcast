@@ -48,6 +48,9 @@ this is a credible finding rather than a disappointing one.
 
 ## Quickstart
 
+> The report generator (`12_build_report.py`) needs Node.js installed
+> (`node --version`). Everything else is pure Python.
+
 ```bash
 uv sync
 uv run pytest                              # 69 tests
@@ -63,6 +66,7 @@ uv run python scripts/08_horse_race.py     # full horse race (incl. DFM, slow)
 uv run python scripts/09_news.py           # news decomposition
 uv run python scripts/10_live_nowcast.py   # current-quarter nowcast
 uv run python scripts/11_build_dashboard_data.py
+uv run python scripts/12_build_report.py   # research report (.docx, needs Node.js)
 
 # or chain them all
 uv run python scripts/run_all.py
@@ -103,6 +107,7 @@ src/ausgdp/
   factor.py       mixed-frequency dynamic factor model + news decomposition
 scripts/          01-11 pipeline + run_all.py
 dashboard/        static HTML dashboard + data.json
+report/           generated research report (.docx) + figures
 tests/            69 tests: leakage, ragged edge, transforms, models, news
 ```
 
