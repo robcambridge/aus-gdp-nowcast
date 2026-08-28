@@ -20,7 +20,7 @@ June quarter lands in early September. So when GDP for quarter *t* is released,
 quarter *t+1* is already over but unmeasured. This system nowcasts *t+1* using
 only data published on or before a given date.
 
-## Why point-in-time is the whole game
+## The importance of the point-in-time system
 
 The informational edge comes from monthly data arriving before GDP does. That
 edge is only real if the backtest respects **when each number was actually
