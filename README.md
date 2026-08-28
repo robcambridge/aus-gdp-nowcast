@@ -23,8 +23,8 @@ only data published on or before a given date.
 ## The importance of the point-in-time system
 
 The informational edge comes from monthly data arriving before GDP does. That
-edge is only real if the backtest respects **when each number was actually
-published**. Every observation carries an `available_from` date, and snapshots
+edge is only real if the backtest respects when each number was actually
+published. Every observation carries an `available_from` date, and snapshots
 are built by filtering on it, so look-ahead bias is structurally impossible
 rather than something to remember. Publication lags are conservative upper
 bounds verified against the ABS release calendar; each lag records the observed
