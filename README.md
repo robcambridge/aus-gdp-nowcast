@@ -15,7 +15,7 @@ univariate benchmarks.
 
 ## The problem this project addresses
 
-The ABS publishes quarterly GDP about nine weeks after the quarter ends — the
+The ABS publishes quarterly GDP about nine weeks after the quarter ends: the
 June quarter lands in early September. So when GDP for quarter *t* is released,
 quarter *t+1* is already over but unmeasured. This system nowcasts *t+1* using
 only data published on or before a given date.
