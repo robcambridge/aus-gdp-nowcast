@@ -1,4 +1,4 @@
-*NOT LIVE MODEL DASHBOARD: https://robcambridge.github.io/aus-gdp-nowcast/
+*MODEL DASHBOARD: https://robcambridge.github.io/aus-gdp-nowcast/
 
 # Australian GDP Nowcasting System
 
