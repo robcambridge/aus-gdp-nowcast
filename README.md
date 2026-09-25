@@ -133,8 +133,6 @@ tests/            69 tests: leakage, ragged edge, transforms, models, news
 2. **Constant publication lags** across the sample, though ABS releases were
    slower historically.
 3. **Short sample** (~130 quarters post-1983), which limits flexible models.
-4. **COVID:** 2020Q2 is a ~10σ observation; results are reported full-sample,
-   pre-COVID, and 1993–2019 separately.
 
 ## Data sources
 
